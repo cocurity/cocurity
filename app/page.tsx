@@ -43,7 +43,7 @@ export default function HomePage() {
             tag="<Before Launch>"
           />
           <ModeTiltCard
-            title="Dependency Risk Check"
+            title="Open Source Risk Check"
             summary="Assess security risks before you clone or integrate."
             cta="Before Clone"
             href="/scan?mode=dependency"

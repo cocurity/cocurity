@@ -1,76 +1,78 @@
-# LaunchPass — MVP PRD (One-Pager)
+# Cocurity — Current MVP PRD
 
-## Goal
-Ship a working URL demo today:
-Public GitHub repo scan -> results -> rescan -> (if pass) certificate -> verify/search.
+## Product Goal
+Provide a polished end-to-end flow for public repository security checks:
 
-## Must-have (Acceptance Criteria)
-1) User can paste a public GitHub repo URL and start scan.
-2) Result page loads within ~30s (or shows friendly error if limited).
-3) Result page shows:
-   - Score (0–100)
-   - Grade: 🟢 Ready / 🟡 Caution / 🔴 Block
-   - Verdict: Launch Ready / Blocked
-4) Findings list shows, per item:
-   - severity (critical|warning)
-   - location (file path)
-   - riskSummary (1 sentence)
-   - hint (principle-level only; no code/diff/exact config)
-   - confidence (high|medium|low)
-5) Rescan works:
-   - Backend caches by repoUrl + commitHash (+ scanConfigVersion)
-   - Frontend provides a rescan button
-6) Certificate (feature-flagged, but implemented):
-   - Issue only if critical == 0
-   - Generates PNG certificate containing:
-     - certId, issuedAt, repoUrl, commit(7 chars), score, grade
-     - Verify URL + QR pointing to /verify/:certId
-7) Public verification:
-   - /verify/:certId shows status: valid / revoked / expired / not found
-   - /verify search page allows certId lookup
-8) /changelog exists with 5+ items.
+`scan -> findings/report -> notify/gift flow -> certificate/verification -> my page tracking`
 
-## API contracts (fixed)
-POST /api/scan                  { repoUrl } -> { scanId }
-GET  /api/scan/:scanId          -> { scan, findings[] }
-POST /api/scan/:scanId/rescan   -> { scanId }
-POST /api/certificate           { scanId } -> { certId }
-GET  /api/verify/:certId        -> { status, certificate, scanSummary }
-POST /api/fix-request           { scanId, contact, urgency, notes } -> { requestId }
+## Primary User Flows
+1. User runs scan from `/scan` in either mode:
+   - Pre-Launch Security Audit
+   - Open Source Risk Check
+2. User views result at `/scan/[scanId]`.
+3. User opens issue report `/r/[reportId]`.
+4. User verifies certificate via `/verify` and `/verify/[certId]`.
+5. User can start checkout from result actions (`Cocourity Fix`) and complete simulated payment at `/pricing`.
+6. User sees Cocurity Fix request statuses in `/mypage`.
 
-## Scoring & Grade
-- Base 100
-- Critical: -30 each
-- Warning:  -10 each
-- Grade:
-  - Critical>=1 => Block (🔴) verdict=blocked
-  - Critical=0 & Warning>=1 => Caution (🟡)
-  - Critical=0 & Warning=0 => Ready (🟢)
+## Current Acceptance Criteria
+1. Scan can start with public GitHub URL and returns `scanId`.
+2. Scan result page always shows score/grade/verdict + counts.
+3. Findings are rendered with:
+   - `severity`, `location`, `riskSummary`, `hint`, `confidence`.
+4. Dependency mode supports maintainer notification modal.
+5. Gift checkout flow works:
+   - select one-time gift options
+   - complete simulated payment
+   - return to result page with completion feedback.
+6. Certificate issuance works when critical findings are zero.
+7. Verify pages show trustworthy metadata + status (`valid`, `outdated`, `invalid`).
+8. My page provides:
+   - `My Cocurity Fix` status list
+   - report history list
+   - demo status progression controls.
 
-## Hint policy (product rule)
-- The product’s job is to pinpoint issues + give direction, not provide detailed fixes.
-- Never output raw secrets; mask/omit.
-- No “100% secure” claim.
+## Fixed API Contracts
+- `POST /api/scan` `{ repoUrl } -> { scanId }`
+- `GET /api/scan/:scanId` `-> { scan, findings[] }`
+- `POST /api/scan/:scanId/rescan` `-> { scanId }`
+- `POST /api/certificate` `{ scanId } -> { certId }`
+- `GET /api/verify/:certId` `-> { status, certificate, scanSummary }`
+- `POST /api/fix-request` `{ scanId, contact, urgency, notes } -> { requestId }`
 
-## Roles / Responsibilities
-Frontend (Funzy):
-- Implement all MVP routes + Alyak-style UI
-- Typed API client + types
-- Mock mode for end-to-end demo without backend
-- Loading/error/empty states
-- Feature-flag UI for Fix/Certificate
+## Scoring & Verdict Rules
+- Base: `100`
+- Critical: `-30`
+- Warning: `-10`
+- Verdict:
+  - `critical >= 1` => `blocked`
+  - `critical = 0 && warning >= 1` => `caution`
+  - `critical = 0 && warning = 0` => `ready`
 
-Backend (Fullstack dev):
-- Implement API endpoints
-- DB + persistence
-- Rule-based scanning engine (+ optional AI summary toggle)
-- Cache by repo+commit
-- Certificate issuance & PNG generation
-- Verify/search endpoints
-- Basic abuse protection + helpful errors
+## Scanner Constraints (MVP)
+- Public GitHub repositories only
+- Rule-based detection (no raw secret output)
+- Limits:
+  - max files: `200`
+  - max text fetched: `2MB`
+- Friendly errors for:
+  - invalid URL
+  - GitHub fetch failure
+  - rate limit
+  - oversized repository
 
-## Non-goals (MVP)
-- Private repo OAuth/GitHub App
-- Full payment integration (link-only OK)
-- Deep security audit coverage
-- Post-launch monitoring
+## Checkout & Pricing (Current UX)
+- Membership plans:
+  - Plus `$19/month`
+  - Pro `$49/month`
+- One-time gift passes:
+  - Cocurity Fix Pass `$149`
+  - Certification Pass `$39`
+  - bundle discount `$19` when both selected
+- Payment is simulated UI (Stripe-like), no real charge execution.
+
+## Non-goals
+- Real payment processing and settlement
+- Private repo OAuth integration
+- Enterprise RBAC/user identity backend
+- Full remediation automation pipeline

@@ -46,12 +46,9 @@ export default async function ReportDetailPage({ params }: Props) {
       <section className="co-noise-card rounded-2xl p-6">
         <p className="lp-badge">Cocurity Public Report</p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold text-slate-100">Safe Shareable Summary</h1>
+          <h1 className="text-2xl font-semibold text-slate-100">Safe Issue Report</h1>
           <VerdictBadge kind={verdictTone(criticalCount, warningCount)} />
         </div>
-        <p className="mt-2 text-sm text-slate-300">
-          This summary intentionally hides file paths and sensitive technical details.
-        </p>
         {!hasRealReport ? (
           <p className="mt-2 text-sm text-amber-200">
             Report ID not found. Showing a placeholder public summary shell.
@@ -91,14 +88,28 @@ export default async function ReportDetailPage({ params }: Props) {
       </section>
 
       <section className="co-noise-card rounded-2xl p-6">
-        <h2 className="text-lg font-semibold text-slate-100">Full Diagnostic</h2>
-        <p className="mt-1 text-sm text-slate-300">Detailed report access is gated in this public view.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" className="lp-button lp-button-ghost" disabled>
-            View full diagnostic (gated)
-          </button>
-          <Link href="/verify" className="lp-button lp-button-primary no-underline">
-            Verify Certificate
+        <h2 className="text-lg font-semibold text-slate-100">Detailed Findings</h2>
+        <ul className="mt-3 space-y-3">
+          {!scan || scan.findings.length === 0 ? (
+            <li className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-300">
+              No findings for this report.
+            </li>
+          ) : (
+            scan.findings.map((finding) => (
+              <li key={finding.id} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                <p className="text-sm font-semibold text-slate-100">
+                  {finding.severity.toUpperCase()} • {finding.location}
+                </p>
+                <p className="mt-1 text-sm text-slate-200">{finding.riskSummary}</p>
+                <p className="mt-1 text-sm text-slate-300">Hint: {finding.hint}</p>
+                <p className="mt-1 text-xs text-slate-400">Confidence: {finding.confidence}</p>
+              </li>
+            ))
+          )}
+        </ul>
+        <div className="mt-4">
+          <Link href="/scan" className="lp-button lp-button-ghost no-underline">
+            Back
           </Link>
         </div>
       </section>

@@ -8,6 +8,35 @@ import { getScanHistory, ScanHistoryItem, upsertScanHistoryItem } from "@/lib/cl
 
 const PROGRESS_STEPS = ["queued", "fetching", "analyzing", "reporting"] as const;
 const EXAMPLE_REPO = "https://github.com/octocat/Hello-World";
+const PLANS = [
+  {
+    id: "plus",
+    name: "Plus",
+    price: 19,
+    monthlyScans: 300,
+    fileLimit: "2,000 files/scan",
+    textLimit: "20MB text/scan",
+    cta: "Upgrade to Plus",
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: 49,
+    monthlyScans: 2000,
+    fileLimit: "10,000 files/scan",
+    textLimit: "100MB text/scan",
+    cta: "Upgrade to Pro",
+  },
+] as const;
+
+function isScanLimitError(message: string) {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("exceeds mvp scan limits") ||
+    lower.includes("max 200 files") ||
+    lower.includes("max 2mb text")
+  );
+}
 
 function isValidGithubRepoUrl(value: string) {
   try {
@@ -31,6 +60,8 @@ export default function ScanClient() {
   const [stepIndex, setStepIndex] = useState(0);
   const [recent, setRecent] = useState<ScanHistoryItem[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [scanLimitMessage, setScanLimitMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setRecent(getScanHistory().slice(0, 8));
@@ -47,7 +78,7 @@ export default function ScanClient() {
   }, [isSubmitting]);
 
   const modeTitle = useMemo(
-    () => (mode === "audit" ? "Pre-Launch Security Audit" : "Dependency Risk Check"),
+    () => (mode === "audit" ? "Pre-Launch Security Audit" : "Open Source Risk Check"),
     [mode]
   );
 
@@ -73,7 +104,12 @@ export default function ScanClient() {
       });
       const data = (await res.json()) as { scanId?: string; error?: string };
       if (!res.ok || !data.scanId) {
-        setError(data.error ?? "Scan request failed.");
+        const message = data.error ?? "Scan request failed.";
+        setError(message);
+        if (isScanLimitError(message)) {
+          setScanLimitMessage(message);
+          setShowUpgradeModal(true);
+        }
         return;
       }
 
@@ -120,7 +156,7 @@ export default function ScanClient() {
             ].join(" ")}
             onClick={() => setMode("dependency")}
           >
-            Dependency Risk Check
+            Open Source Risk Check
           </button>
         </div>
 
@@ -225,6 +261,58 @@ export default function ScanClient() {
           </ul>
         )}
       </section>
+
+      <AnimatePresence>
+        {showUpgradeModal ? (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              className="co-noise-card w-full max-w-3xl rounded-2xl p-6"
+            >
+              <p className="lp-badge">Scan Limit Reached</p>
+              <h2 className="mt-3 text-2xl font-semibold text-slate-100">Unlock larger scans with Plus or Pro</h2>
+              <p className="mt-2 text-sm text-slate-300">
+                {scanLimitMessage ??
+                  "This repository exceeds the current free scan limits. Upgrade to continue with larger repositories."}
+              </p>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {PLANS.map((plan) => (
+                  <div key={plan.id} className="rounded-xl border border-white/15 bg-white/5 p-4">
+                    <p className="text-sm uppercase tracking-[0.14em] text-slate-300">{plan.name}</p>
+                    <p className="mt-2 text-3xl font-semibold text-slate-100">${plan.price}</p>
+                    <p className="text-xs text-slate-400">USD / month</p>
+                    <ul className="mt-3 space-y-1 text-sm text-slate-200">
+                      <li>{plan.monthlyScans.toLocaleString()} scans / month</li>
+                      <li>{plan.fileLimit}</li>
+                      <li>{plan.textLimit}</li>
+                    </ul>
+                    <Link
+                      href={`/pricing?plan=${plan.id}`}
+                      className="lp-button lp-button-primary mt-4 inline-flex no-underline"
+                    >
+                      {plan.cta}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4">
+                <button type="button" className="lp-button lp-button-ghost" onClick={() => setShowUpgradeModal(false)}>
+                  Continue on Free
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </main>
   );
 }

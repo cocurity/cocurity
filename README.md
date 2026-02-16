@@ -1,69 +1,86 @@
-# LaunchPass (MVP)
+# Cocurity
 
-Alyak-style pre-launch security checker for vibe-coded products.
+Fullstack MVP for repository security scanning, certificate verification, and fix-request checkout flow.
 
-## What it does
-- Free: Scan a public GitHub repo and show:
-  - Score (0–100)
-  - Grade: 🟢 Ready / 🟡 Caution / 🔴 Block
-  - Verdict: Launch Ready / Blocked
-  - Findings list with location + risk summary + principle-level hint
-- Paid (feature-flag): Fix request + Certificate issuance
-- Certificate anti-forgery:
-  - PNG certificate + Certificate ID
-  - Verify URL + QR on the certificate
-  - Public verify & search pages (anyone can validate)
+## Current Product Scope
+- Two scan modes:
+  - `Pre-Launch Security Audit`
+  - `Open Source Risk Check`
+- GitHub public repo scan with:
+  - score / grade / verdict
+  - findings (`severity`, `location`, `riskSummary`, `hint`, `confidence`)
+- Certificate issuance and verification:
+  - certificate ID format: `LP-XXXX-XXXX`
+  - certificate image output in `public/certs`
+  - verification page with status (`valid`, `outdated`, `invalid`)
+- Share flow for maintainers:
+  - notify message
+  - gift-pack checkout flow for remediation/certification
+- User workspace (`My page`):
+  - local login toggle
+  - Cocurity Fix request status tracking
+  - report history
 
-## MVP routes
-- `/` dashboard
-- `/scan` repo URL input
-- `/scan/[scanId]` scan result
-- `/verify` search by certificate ID
-- `/verify/[certId]` verify detail page
-- `/changelog` static changelog (5+ items)
+## App Routes
+- `/` Home
+- `/scan` Scan workspace
+- `/scan/[scanId]` Scan result
+- `/r/[reportId]` Issue report detail
+- `/verify` Certificate search
+- `/verify/[certId]` Certificate verification detail
+- `/pricing` Checkout UI (simulated payment UX)
+- `/mypage` User workspace (local-state based)
+- `/changelog` Changelog page
+- `/ui` UI showcase
 
-## Tech (single repo, fullstack)
-- Next.js App Router + TypeScript
-- TailwindCSS
-- Prisma + SQLite (local dev)
-- API via Next Route Handlers: `/app/api/*`
+## API Contracts (kept stable)
+- `POST /api/scan` `{ repoUrl } -> { scanId }`
+- `GET /api/scan/:scanId` `-> { scan, findings[] }`
+- `POST /api/scan/:scanId/rescan` `-> { scanId }`
+- `POST /api/certificate` `{ scanId } -> { certId }`
+- `GET /api/verify/:certId` `-> { status, certificate, scanSummary }`
+- `POST /api/fix-request` `{ scanId, contact, urgency, notes } -> { requestId }`
 
-## API contracts (backend provides, frontend consumes)
-POST `/api/scan`                  { "repoUrl": "..." } -> { "scanId": "..." }
-GET  `/api/scan/:scanId`          -> { "scan": {...}, "findings": [...] }
-POST `/api/scan/:scanId/rescan`   -> { "scanId": "..." }
-POST `/api/certificate`           { "scanId": "..." } -> { "certId": "..." }
-GET  `/api/verify/:certId`        -> { "status": "...", "certificate": {...}, "scanSummary": {...} }
-POST `/api/fix-request`           { "scanId": "...", "contact": "...", "urgency": "...", "notes": "..." } -> { "requestId": "..." }
+## Scoring Rules
+- Base score: `100`
+- `critical`: `-30` each
+- `warning`: `-10` each
+- Grade / verdict:
+  - critical `>= 1` => `Block` / `blocked`
+  - critical `= 0` and warning `>= 1` => `Caution`
+  - critical `= 0` and warning `= 0` => `Ready`
 
-## Scoring (simple)
-- Base score = 100
-- Critical: -30 each
-- Warning:  -10 each
-- Grade/Verdict:
-  - Critical >= 1 => Block (🔴) / Blocked
-  - Critical = 0 & Warning >= 1 => Caution (🟡)
-  - Critical = 0 & Warning = 0 => Ready (🟢)
+## Scanner Rules (MVP)
+- Sensitive filenames: `.env`, `*.pem`, `keystore`, `credentials`, `serviceAccount*.json`
+- Secret patterns: `sk-`, `AKIA`, `BEGIN PRIVATE KEY`, `MNEMONIC`, `PRIVATE_KEY`
+- Risky config hints: `Access-Control-Allow-Origin: *`, `cors: *`, `publicRead`, `allow all`
+- Limits:
+  - max files scanned: `200`
+  - max fetched text: `2MB`
 
-## Hint policy (IMPORTANT)
-- Hints are principle-level only.
-- Do NOT provide code diffs, exact config values, or step-by-step fix instructions.
-- Never display raw secrets (mask/omit).
+## Security Output Policy
+- Principle-level hints only
+- No raw secret exposure in API/UI
+- No step-by-step exploit/fix disclosure in findings
 
-## Feature flags (.env)
+## Feature Flags
 Frontend:
-- NEXT_PUBLIC_AGENT_ROLE=frontend|backend  (optional, for Codex clarity)
-- NEXT_PUBLIC_FF_MOCK=0|1
-- NEXT_PUBLIC_FF_FIX_ENABLED=0|1
-- NEXT_PUBLIC_FF_CERT_ENABLED=0|1
+- `NEXT_PUBLIC_FF_FIX_ENABLED=0|1`
+- `NEXT_PUBLIC_FF_CERT_ENABLED=0|1`
 
 Backend:
-- FF_AI_SUMMARY_ENABLED=0|1
-- FF_FIX_ENABLED=0|1
-- FF_CERT_ENABLED=0|1
-- GITHUB_TOKEN=... (optional; to reduce rate limits; never required for basic MVP)
+- `FF_FIX_ENABLED=0|1`
+- `FF_CERT_ENABLED=0|1`
+- `FF_AI_SUMMARY_ENABLED=0|1` (optional)
+- `GITHUB_TOKEN` (optional, for higher API limits)
 
-## Local run
-- npm install
-- npx prisma migrate dev
-- npm run dev
+## Tech Stack
+- Next.js App Router + TypeScript
+- TailwindCSS
+- Prisma + SQLite
+- Next Route Handlers (`app/api/*`)
+
+## Run Locally
+1. `npm install`
+2. `npx prisma migrate dev`
+3. `npm run dev`

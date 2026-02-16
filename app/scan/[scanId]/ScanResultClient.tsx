@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useRouter } from "next/navigation";
-import CopyButton from "@/components/ui/CopyButton";
+import { useRouter, useSearchParams } from "next/navigation";
 import StatTiles from "@/components/ui/StatTiles";
 import VerdictBadge from "@/components/ui/VerdictBadge";
 import SeverityPills from "@/components/ui/SeverityPills";
@@ -66,46 +65,57 @@ export default function ScanResultClient({
   mode: "audit" | "dependency";
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [isRescanning, setIsRescanning] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
-  const [senderGhUsername, setSenderGhUsername] = useState("your_github_username");
-  const [giftCode, setGiftCode] = useState("COCU-FREE-DIAG");
-  const [fixRequesting, setFixRequesting] = useState(false);
+  const [showGiftOptions, setShowGiftOptions] = useState(false);
+  const [giftFixPass, setGiftFixPass] = useState(true);
+  const [giftCertPass, setGiftCertPass] = useState(true);
+  const [showPaymentDoneModal, setShowPaymentDoneModal] = useState(false);
 
-  const ffFix = process.env.NEXT_PUBLIC_FF_FIX_ENABLED === "1";
   const ffCert = process.env.NEXT_PUBLIC_FF_CERT_ENABLED === "1";
 
   const categories = useMemo(() => topRiskCategories(initialData.findings), [initialData.findings]);
   const tone = getVerdictTone(initialData.scan);
   const canIssueCertificate = ffCert && initialData.scan.criticalCount === 0;
+  const isNoFindingsAudit = mode === "audit" && initialData.findings.length === 0;
+  const isNoCategoryDependency = mode === "dependency" && categories.length === 0;
   const reportId = initialData.scan.id;
   const repoName = initialData.scan.repoUrl.split("/").slice(-1)[0] || "repository";
-  const notifyTemplate = `Hi maintainer of ${repoName}, Cocurity found potential security issues. View report: https://cocurity.com/r/${reportId} 🎁 Gift from ${senderGhUsername} — Gift code: ${giftCode} (free full diagnostic + certificate)`;
+  const giftPurchased = searchParams.get("gift_paid") === "1";
+  const paymentDone = searchParams.get("payment_done") === "1";
+  const notifyTemplate = giftPurchased
+    ? [
+        `Hi maintainer of ${repoName}, Cocurity found potential security issues.`,
+        `View report: https://cocurity.com/r/${reportId}`,
+        "🎁 Gift from cocurity — Gift code: COCU-FREE-DIAG (free full diagnostic + certificate)",
+      ].join("\n")
+    : [
+        `Hi maintainer of ${repoName}, Cocurity found potential security issues.`,
+        `View report: https://cocurity.com/r/${reportId}`,
+      ].join("\n");
+
+  useEffect(() => {
+    if (!giftPurchased) return;
+    setShowNotifyModal(true);
+    setShowGiftOptions(false);
+  }, [giftPurchased]);
+
+  useEffect(() => {
+    if (!paymentDone) return;
+    setShowPaymentDoneModal(true);
+  }, [paymentDone]);
+
+  useEffect(() => {
+    if (!actionMessage) return;
+    const timer = window.setTimeout(() => setActionMessage(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [actionMessage]);
 
   function toggleExpanded(id: string) {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  async function onRescan() {
-    setActionMessage(null);
-    setIsRescanning(true);
-    try {
-      const res = await fetch(`/api/scan/${initialData.scan.id}/rescan`, { method: "POST" });
-      const body = (await res.json()) as { scanId?: string; error?: string };
-      if (!res.ok || !body.scanId) {
-        setActionMessage(body.error ?? "Rescan failed.");
-        return;
-      }
-      router.push(`/scan/${body.scanId}?mode=${mode}`);
-      router.refresh();
-    } catch {
-      setActionMessage("Network error during rescan.");
-    } finally {
-      setIsRescanning(false);
-    }
   }
 
   async function onIssueCertificate() {
@@ -122,7 +132,7 @@ export default function ScanResultClient({
         setActionMessage(body.error ?? "Certificate issuance failed.");
         return;
       }
-      router.push(`/verify/${body.certId}`);
+      router.push(`/verify/${body.certId}?issued=1`);
     } catch {
       setActionMessage("Network error during certificate issuance.");
     } finally {
@@ -130,31 +140,35 @@ export default function ScanResultClient({
     }
   }
 
-  async function onRequestFix() {
-    setActionMessage(null);
-    setFixRequesting(true);
+  async function onSendMessage() {
     try {
-      const res = await fetch("/api/fix-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scanId: initialData.scan.id,
-          contact: "security-contact@example.com",
-          urgency: "medium",
-          notes: "Please review and prioritize remediation steps.",
-        }),
-      });
-      const body = (await res.json()) as { requestId?: string; error?: string };
-      if (!res.ok || !body.requestId) {
-        setActionMessage(body.error ?? "Fix request failed.");
-        return;
-      }
-      setActionMessage(`Fix request submitted: ${body.requestId}`);
+      await navigator.clipboard.writeText(notifyTemplate);
+      setActionMessage("Message sent!");
     } catch {
-      setActionMessage("Network error during fix request.");
-    } finally {
-      setFixRequesting(false);
+      setActionMessage("Message sending failed.");
     }
+  }
+
+  function onGiftCheckout() {
+    const returnTo = `/scan/${initialData.scan.id}?mode=${mode}&gift_paid=1`;
+    const href =
+      `/pricing?plan=pro&context=gift` +
+      `&returnTo=${encodeURIComponent(returnTo)}` +
+      `&scanId=${encodeURIComponent(initialData.scan.id)}` +
+      `&repoUrl=${encodeURIComponent(initialData.scan.repoUrl)}` +
+      `&giftFix=${giftFixPass ? "1" : "0"}` +
+      `&giftCert=${giftCertPass ? "1" : "0"}`;
+    router.push(href);
+  }
+
+  function onCocourityFixCheckout() {
+    const returnTo = `/scan/${initialData.scan.id}?mode=${mode}`;
+    router.push(
+      `/pricing?context=gift&plan=pro&giftFix=1&giftCert=0` +
+        `&scanId=${encodeURIComponent(initialData.scan.id)}` +
+        `&repoUrl=${encodeURIComponent(initialData.scan.repoUrl)}` +
+        `&returnTo=${encodeURIComponent(returnTo)}`
+    );
   }
 
   return (
@@ -200,9 +214,15 @@ export default function ScanResultClient({
             )}
           </ul>
           <div className="mt-5">
-            <button type="button" className="lp-button lp-button-primary" onClick={() => setShowNotifyModal(true)}>
-              Notify maintainer
-            </button>
+            {isNoCategoryDependency ? (
+              <button type="button" className="lp-button lp-button-ghost" onClick={() => router.push("/scan")}>
+                Back
+              </button>
+            ) : (
+              <button type="button" className="lp-button lp-button-primary" onClick={() => setShowNotifyModal(true)}>
+                Notify maintainer
+              </button>
+            )}
           </div>
         </section>
       ) : (
@@ -253,31 +273,46 @@ export default function ScanResultClient({
           </ul>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            <button type="button" className="lp-button lp-button-primary" onClick={onRescan} disabled={isRescanning}>
-              {isRescanning ? "Rescanning..." : "Rescan"}
-            </button>
-            {ffFix ? (
-              <button type="button" className="lp-button lp-button-ghost" onClick={onRequestFix} disabled={fixRequesting}>
-                {fixRequesting ? "Requesting..." : "Request Fix"}
-              </button>
-            ) : null}
-            {canIssueCertificate ? (
-              <button type="button" className="lp-button lp-button-ghost" onClick={onIssueCertificate} disabled={isIssuing}>
-                {isIssuing ? "Issuing..." : "Issue Certificate"}
-              </button>
-            ) : null}
+            {isNoFindingsAudit ? (
+              <>
+                <button type="button" className="lp-button lp-button-ghost" onClick={() => router.push("/scan")}>
+                  Back
+                </button>
+                <button
+                  type="button"
+                  className="lp-button lp-button-primary"
+                  onClick={onIssueCertificate}
+                  disabled={isIssuing || !canIssueCertificate}
+                >
+                  {isIssuing ? "Issuing..." : "Get Certification"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="lp-button lp-button-primary"
+                  onClick={() => router.push(`/r/${initialData.scan.id}`)}
+                >
+                  Open report
+                </button>
+                <button type="button" className="lp-button lp-button-ghost" onClick={onCocourityFixCheckout}>
+                  Cocourity Fix
+                </button>
+              </>
+            )}
           </div>
         </section>
       )}
 
-      {actionMessage ? <p className="text-sm text-slate-300">{actionMessage}</p> : null}
-
-      <Link
-        className="inline-flex items-center text-sm text-cyan-200 no-underline hover:underline"
-        href={`/r/${initialData.scan.id}`}
-      >
-        Open public report summary →
-      </Link>
+      {mode === "dependency" && !isNoFindingsAudit && !isNoCategoryDependency ? (
+        <Link
+          className="inline-flex items-center text-sm text-cyan-200 no-underline hover:underline"
+          href={`/r/${initialData.scan.id}`}
+        >
+          Open issue report →
+        </Link>
+      ) : null}
 
       <AnimatePresence>
         {showNotifyModal ? (
@@ -298,33 +333,108 @@ export default function ScanResultClient({
                 Share a concise security notification without exposing sensitive report details.
               </p>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="text-xs text-slate-300">
-                  Sender GitHub Username
-                  <input
-                    className="mt-1 w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-slate-100"
-                    value={senderGhUsername}
-                    onChange={(event) => setSenderGhUsername(event.target.value)}
-                  />
-                </label>
-                <label className="text-xs text-slate-300">
-                  Gift Code
-                  <input
-                    className="mt-1 w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-slate-100"
-                    value={giftCode}
-                    onChange={(event) => setGiftCode(event.target.value)}
-                  />
-                </label>
-              </div>
-
               <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-200">
-                {notifyTemplate}
+                <div className="space-y-1 whitespace-pre-line">
+                  {notifyTemplate}
+                </div>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <CopyButton value={notifyTemplate} label="Copy message" />
+                <button type="button" className="lp-button lp-button-primary" onClick={onSendMessage}>
+                  Send message
+                </button>
                 <button type="button" className="lp-button lp-button-ghost" onClick={() => setShowNotifyModal(false)}>
                   Close
+                </button>
+                {!giftPurchased ? (
+                  <>
+                    <button
+                      type="button"
+                      className="lp-button lp-button-ghost"
+                      onClick={() => setShowGiftOptions((prev) => !prev)}
+                    >
+                      Gift remediation rights
+                    </button>
+                  </>
+                ) : null}
+              </div>
+
+              {showGiftOptions && !giftPurchased ? (
+                <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-slate-400">Gift options</p>
+                  <div className="mt-3 space-y-2">
+                    <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={giftFixPass}
+                        onChange={(event) => setGiftFixPass(event.target.checked)}
+                        className="mt-1"
+                      />
+                      <span>
+                        <strong>Cocurity Fix Pass</strong>: Cocurity directly fixes detected issues.
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={giftCertPass}
+                        onChange={(event) => setGiftCertPass(event.target.checked)}
+                        className="mt-1"
+                      />
+                      <span>
+                        <strong>Certification Pass</strong>: After fixes and Cocurity re-scan, certification can be issued.
+                      </span>
+                    </label>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      className="lp-button lp-button-primary"
+                      onClick={onGiftCheckout}
+                      disabled={!giftFixPass && !giftCertPass}
+                    >
+                      Gift now
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {actionMessage ? (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="fixed left-1/2 top-6 z-[70] -translate-x-1/2 rounded-lg border border-white/15 bg-black/85 px-4 py-2 text-sm text-white shadow-xl backdrop-blur"
+          >
+            {actionMessage}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showPaymentDoneModal ? (
+          <motion.div
+            className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ y: 12, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 12, opacity: 0 }}
+              className="co-noise-card w-full max-w-md rounded-2xl p-6"
+            >
+              <h3 className="text-lg font-semibold text-slate-100">결제완료!</h3>
+              <p className="mt-2 text-sm text-slate-300">결제 당시 입력한 이메일함을 확인해주세요</p>
+              <div className="mt-5">
+                <button type="button" className="lp-button lp-button-primary" onClick={() => setShowPaymentDoneModal(false)}>
+                  닫기
                 </button>
               </div>
             </motion.div>

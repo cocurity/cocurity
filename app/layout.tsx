@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
+import TopNav from "@/components/layout/TopNav";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -34,13 +35,7 @@ export default function RootLayout({
               <span className="lp-brand-dot" />
               Cocurity
             </Link>
-            <nav className="lp-nav">
-              <Link href="/">Home</Link>
-              <Link href="/scan">Scans</Link>
-              <Link href="/r/demo-report">Reports</Link>
-              <Link href="/verify">Verify</Link>
-              <Link href="/ui">UI</Link>
-            </nav>
+            <TopNav />
           </div>
         </header>
         <div className="lp-shell">{children}</div>

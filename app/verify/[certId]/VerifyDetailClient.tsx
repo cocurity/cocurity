@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import CopyButton from "@/components/ui/CopyButton";
 import VerdictBadge from "@/components/ui/VerdictBadge";
@@ -30,10 +31,12 @@ type VerifyResponse = {
 };
 
 export default function VerifyDetailClient({ certId }: { certId: string }) {
+  const searchParams = useSearchParams();
   const [data, setData] = useState<VerifyResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -89,7 +92,7 @@ export default function VerifyDetailClient({ certId }: { certId: string }) {
       return {
         label: "Valid (Up-to-date)",
         badge: "lp-badge lp-badge-ready",
-        desc: "Certificate scope matches the latest tracked repository commit.",
+        desc: "Prove your code’s security with Cocurity’s official certification.",
       };
     }
     if (data.status === "outdated") {
@@ -105,6 +108,14 @@ export default function VerifyDetailClient({ certId }: { certId: string }) {
       desc: "Certificate is revoked, expired, or cannot be trusted.",
     };
   }, [data]);
+
+  const isJustIssued = searchParams.get("issued") === "1";
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 1800);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   if (loading) {
     return (
@@ -142,12 +153,39 @@ export default function VerifyDetailClient({ certId }: { certId: string }) {
     ? data.certificate.verifyUrl
     : `${typeof window !== "undefined" ? window.location.origin : ""}${data.certificate.verifyUrl}`;
 
+  async function onShare() {
+    try {
+      await navigator.clipboard.writeText(verifyUrl);
+      setToast("Copied!");
+    } catch {
+      setToast("Copy failed.");
+    }
+  }
+
+  async function onDownload() {
+    try {
+      const res = await fetch(data.certificate!.pngPath);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${data.certificate!.certId}.png`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setToast("Download completed!");
+    } catch {
+      setToast("Download failed.");
+    }
+  }
+
   return (
     <main className="space-y-6">
       <section className="co-noise-card rounded-2xl p-6">
         <p className="lp-badge">Official Cocurity Verification</p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold text-slate-100">Certificate Status</h1>
+          <h1 className="text-2xl font-semibold text-slate-100">{isJustIssued ? "Certificate issued." : "Certificate Status"}</h1>
           <VerdictBadge
             kind={
               data.status === "valid" ? "valid" : data.status === "outdated" ? "outdated" : "invalid"
@@ -172,6 +210,14 @@ export default function VerifyDetailClient({ certId }: { certId: string }) {
               height={540}
               className="h-auto w-full"
             />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" className="lp-button lp-button-primary" onClick={onShare}>
+              Share
+            </button>
+            <button type="button" className="lp-button lp-button-ghost" onClick={onDownload}>
+              Download
+            </button>
           </div>
         </motion.div>
 
@@ -221,6 +267,19 @@ export default function VerifyDetailClient({ certId }: { certId: string }) {
           </AnimatePresence>
         </motion.div>
       </section>
+
+      <AnimatePresence>
+        {toast ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/15 bg-black/80 px-3 py-2 text-sm text-white backdrop-blur"
+          >
+            {toast}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </main>
   );
 }
