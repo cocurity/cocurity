@@ -1,20 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { upsertScanHistoryItem } from "@/lib/client/scan-history";
+import CopyButton from "@/components/ui/CopyButton";
+import StatTiles from "@/components/ui/StatTiles";
+import VerdictBadge from "@/components/ui/VerdictBadge";
+import SeverityPills from "@/components/ui/SeverityPills";
 
 type Finding = {
   id: string;
-  severity: "critical" | "warning" | string;
+  severity: "critical" | "warning";
   location: string;
   riskSummary: string;
   hint: string;
-  confidence: "high" | "medium" | "low" | string;
+  confidence: "high" | "medium" | "low";
 };
 
-type ScanResponse = {
+type ScanPayload = {
   scan: {
     id: string;
     repoUrl: string;
@@ -24,88 +28,94 @@ type ScanResponse = {
     criticalCount: number;
     warningCount: number;
     commitHash: string;
+    createdAt: string;
   };
   findings: Finding[];
 };
 
-export default function ScanResultClient({ scanId }: { scanId: string }) {
+function getVerdictTone(scan: ScanPayload["scan"]): "safe" | "caution" | "avoid" {
+  if (scan.criticalCount === 0 && scan.warningCount === 0) return "safe";
+  if (scan.criticalCount >= 1) return "avoid";
+  if (scan.warningCount >= 1) return "caution";
+  return "safe";
+}
+
+function categoryFromFinding(finding: Finding): string {
+  const text = `${finding.riskSummary} ${finding.hint}`.toLowerCase();
+  if (text.includes("secret") || text.includes("credential") || text.includes("key")) return "Secrets";
+  if (text.includes("dependency") || text.includes("package")) return "Dependencies";
+  if (text.includes("cors") || text.includes("access") || text.includes("permission")) return "Access Control";
+  if (text.includes("config") || text.includes("policy")) return "Configuration";
+  return "General Risk";
+}
+
+function topRiskCategories(findings: Finding[]) {
+  const counts = new Map<string, number>();
+  for (const finding of findings) {
+    const category = categoryFromFinding(finding);
+    counts.set(category, (counts.get(category) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+}
+
+export default function ScanResultClient({
+  initialData,
+  mode,
+}: {
+  initialData: ScanPayload;
+  mode: "audit" | "dependency";
+}) {
   const router = useRouter();
-  const [data, setData] = useState<ScanResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [rescanLoading, setRescanLoading] = useState(false);
-  const [fixLoading, setFixLoading] = useState(false);
-  const [certLoading, setCertLoading] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [contact, setContact] = useState("");
-  const [urgency, setUrgency] = useState("medium");
-  const [notes, setNotes] = useState("");
-  const ffCert = process.env.NEXT_PUBLIC_FF_CERT_ENABLED === "1";
+  const [isRescanning, setIsRescanning] = useState(false);
+  const [isIssuing, setIsIssuing] = useState(false);
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [senderGhUsername, setSenderGhUsername] = useState("your_github_username");
+  const [giftCode, setGiftCode] = useState("COCU-FREE-DIAG");
+  const [fixRequesting, setFixRequesting] = useState(false);
+
   const ffFix = process.env.NEXT_PUBLIC_FF_FIX_ENABLED === "1";
+  const ffCert = process.env.NEXT_PUBLIC_FF_CERT_ENABLED === "1";
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/scan/${scanId}`, { cache: "no-store" });
-        const body = (await res.json()) as ScanResponse & { error?: string };
-        if (!res.ok) {
-          setError(body.error ?? "Failed to load scan result.");
-          return;
-        }
-        setData(body);
-        upsertScanHistoryItem({
-          scanId: body.scan.id,
-          repoUrl: body.scan.repoUrl,
-          score: body.scan.score,
-          grade: body.scan.grade,
-          verdict: body.scan.verdict,
-          createdAt: new Date().toISOString(),
-        });
-      } catch {
-        setError("Network error while loading scan result.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [scanId]);
+  const categories = useMemo(() => topRiskCategories(initialData.findings), [initialData.findings]);
+  const tone = getVerdictTone(initialData.scan);
+  const canIssueCertificate = ffCert && initialData.scan.criticalCount === 0;
+  const reportId = initialData.scan.id;
+  const repoName = initialData.scan.repoUrl.split("/").slice(-1)[0] || "repository";
+  const notifyTemplate = `Hi maintainer of ${repoName}, Cocurity found potential security issues. View report: https://cocurity.com/r/${reportId} 🎁 Gift from ${senderGhUsername} — Gift code: ${giftCode} (free full diagnostic + certificate)`;
 
-  const gradeBadgeClass = useMemo(() => {
-    const grade = data?.scan.grade;
-    if (grade === "READY") return "lp-badge lp-badge-ready";
-    if (grade === "CAUTION") return "lp-badge lp-badge-caution";
-    return "lp-badge lp-badge-block";
-  }, [data?.scan.grade]);
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
 
   async function onRescan() {
     setActionMessage(null);
-    setRescanLoading(true);
+    setIsRescanning(true);
     try {
-      const res = await fetch(`/api/scan/${scanId}/rescan`, { method: "POST" });
+      const res = await fetch(`/api/scan/${initialData.scan.id}/rescan`, { method: "POST" });
       const body = (await res.json()) as { scanId?: string; error?: string };
       if (!res.ok || !body.scanId) {
-        setActionMessage(body.error ?? "Rescan request failed.");
+        setActionMessage(body.error ?? "Rescan failed.");
         return;
       }
-      router.push(`/scan/${body.scanId}`);
+      router.push(`/scan/${body.scanId}?mode=${mode}`);
       router.refresh();
     } catch {
-      setActionMessage("Network error while requesting rescan.");
+      setActionMessage("Network error during rescan.");
     } finally {
-      setRescanLoading(false);
+      setIsRescanning(false);
     }
   }
 
   async function onIssueCertificate() {
     setActionMessage(null);
-    setCertLoading(true);
+    setIsIssuing(true);
     try {
       const res = await fetch("/api/certificate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scanId }),
+        body: JSON.stringify({ scanId: initialData.scan.id }),
       });
       const body = (await res.json()) as { certId?: string; error?: string };
       if (!res.ok || !body.certId) {
@@ -114,194 +124,213 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
       }
       router.push(`/verify/${body.certId}`);
     } catch {
-      setActionMessage("Network error while issuing certificate.");
+      setActionMessage("Network error during certificate issuance.");
     } finally {
-      setCertLoading(false);
+      setIsIssuing(false);
     }
   }
 
-  async function onFixRequestSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function onRequestFix() {
     setActionMessage(null);
-    setFixLoading(true);
+    setFixRequesting(true);
     try {
       const res = await fetch("/api/fix-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scanId, contact, urgency, notes }),
+        body: JSON.stringify({
+          scanId: initialData.scan.id,
+          contact: "security-contact@example.com",
+          urgency: "medium",
+          notes: "Please review and prioritize remediation steps.",
+        }),
       });
       const body = (await res.json()) as { requestId?: string; error?: string };
       if (!res.ok || !body.requestId) {
-        setActionMessage(body.error ?? "Fix request submission failed.");
+        setActionMessage(body.error ?? "Fix request failed.");
         return;
       }
       setActionMessage(`Fix request submitted: ${body.requestId}`);
-      setContact("");
-      setNotes("");
-      setUrgency("medium");
     } catch {
-      setActionMessage("Network error while submitting fix request.");
+      setActionMessage("Network error during fix request.");
     } finally {
-      setFixLoading(false);
+      setFixRequesting(false);
     }
   }
 
-  if (loading) {
-    return (
-      <main className="space-y-4">
-        <h1 className="text-2xl font-semibold">Scan Result</h1>
-        <div className="lp-panel animate-pulse p-6">
-          <div className="mb-3 h-4 w-1/3 rounded bg-slate-200" />
-          <div className="mb-2 h-4 w-full rounded bg-slate-200" />
-          <div className="h-4 w-5/6 rounded bg-slate-200" />
-        </div>
-      </main>
-    );
-  }
-
-  if (error) {
-    return (
-      <main className="space-y-4">
-        <h1 className="text-2xl font-semibold">Scan Result</h1>
-        <div className="lp-panel space-y-3 p-6">
-          <p className="text-sm text-red-700">{error}</p>
-          <button className="lp-button lp-button-primary" onClick={() => location.reload()} type="button">
-            Retry
-          </button>
-        </div>
-      </main>
-    );
-  }
-
-  if (!data) {
-    return (
-      <main className="space-y-4">
-        <h1 className="text-2xl font-semibold">Scan Result</h1>
-        <div className="lp-panel p-6 text-sm text-slate-700">No scan data available.</div>
-      </main>
-    );
-  }
-
-  const canIssueCert = ffCert && data.scan.criticalCount === 0;
-
   return (
     <main className="space-y-6">
-      <section className="lp-panel p-6">
-        <div className="mb-3 flex flex-wrap gap-2 text-xs">
-          <span className="lp-badge">Analysis Completed</span>
-          <span className="lp-badge">Risk Classification Applied</span>
-          <span className="lp-badge">Immutable Commit Snapshot</span>
-        </div>
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <section className="co-noise-card rounded-2xl p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">Scan Result</h1>
-            <p className="mt-1 text-xs text-slate-600">{data.scan.repoUrl}</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Cocurity Scan Result</p>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-100">{mode === "dependency" ? "Dependency Mode" : "Audit Mode"}</h1>
           </div>
-          <span className={gradeBadgeClass}>{data.scan.grade}</span>
+          <VerdictBadge kind={tone} />
         </div>
-        <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
-          <p className="rounded bg-white p-3">Score: {data.scan.score}</p>
-          <p className="rounded bg-white p-3">Verdict: {data.scan.verdict}</p>
-          <p className="rounded bg-white p-3">Commit: {data.scan.commitHash.slice(0, 7)}</p>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <span className="lp-badge">Critical {data.scan.criticalCount}</span>
-          <span className="lp-badge">Warning {data.scan.warningCount}</span>
+
+        <StatTiles
+          items={[
+            { label: "Score", value: initialData.scan.score },
+            { label: "Commit", value: initialData.scan.commitHash.slice(0, 7) },
+            { label: "Scanned At", value: new Date(initialData.scan.createdAt).toLocaleDateString() },
+          ]}
+        />
+        <div className="mt-3">
+          <SeverityPills critical={initialData.scan.criticalCount} warning={initialData.scan.warningCount} />
         </div>
       </section>
 
-      <section className="lp-panel p-6">
-        <div className="mb-3 flex flex-wrap gap-2">
-          <button className="lp-button lp-button-primary" type="button" onClick={onRescan} disabled={rescanLoading}>
-            {rescanLoading ? "Rescanning..." : "Rescan"}
-          </button>
-          {ffFix ? (
-            <a className="lp-button lp-button-ghost" href="#fix-request">
-              Fix Request
-            </a>
-          ) : null}
-          {canIssueCert ? (
-            <button
-              className="lp-button lp-button-ghost"
-              type="button"
-              onClick={onIssueCertificate}
-              disabled={certLoading}
-            >
-              {certLoading ? "Issuing..." : "Issue Certificate"}
-            </button>
-          ) : null}
-          <Link href="/verify" className="lp-button lp-button-ghost">
-            Verify Search
-          </Link>
-        </div>
-        {!ffCert ? <p className="text-xs text-slate-600">Certificate feature is currently disabled.</p> : null}
-        {ffCert && data.scan.criticalCount > 0 ? (
-          <p className="text-xs text-slate-600">Certificate issuance requires zero critical findings.</p>
-        ) : null}
-        {actionMessage ? <p className="mt-2 text-sm text-slate-700">{actionMessage}</p> : null}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Findings ({data.findings.length})</h2>
-        {data.findings.length === 0 ? (
-          <div className="lp-panel p-4 text-sm text-slate-700">No findings detected.</div>
-        ) : (
-          <ul className="space-y-3">
-            {data.findings.map((finding) => (
-              <li className="lp-panel p-4" key={finding.id}>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span
-                    className={
-                      finding.severity === "critical" ? "lp-badge lp-badge-block" : "lp-badge lp-badge-caution"
-                    }
-                  >
-                    {finding.severity.toUpperCase()}
-                  </span>
-                  <code className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold">{finding.location}</code>
-                </div>
-                <p className="text-sm">{finding.riskSummary}</p>
-                <p className="mt-2 text-sm text-slate-700">Hint: {finding.hint}</p>
-                <p className="mt-1 text-xs text-slate-600">Confidence: {finding.confidence}</p>
+      {mode === "dependency" ? (
+        <section className="co-noise-card rounded-2xl p-6">
+          <h2 className="text-xl font-semibold text-slate-100">Top 3 Risks (Category Summary)</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            Condensed dependency-focused summary only. Sensitive details are intentionally hidden.
+          </p>
+          <ul className="mt-4 space-y-2">
+            {categories.length === 0 ? (
+              <li className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
+                No category-level risks detected.
               </li>
-            ))}
+            ) : (
+              categories.map(([category, count]) => (
+                <li key={category} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+                  {category} ({count})
+                </li>
+              ))
+            )}
           </ul>
-        )}
-      </section>
-
-      {ffFix ? (
-        <section id="fix-request" className="lp-panel p-6">
-          <h2 className="text-xl font-semibold">Fix Request</h2>
-          <p className="mt-1 text-sm text-slate-700">Submit a remediation support request based on this scan result.</p>
-          <form className="mt-4 grid gap-3 sm:max-w-xl" onSubmit={onFixRequestSubmit}>
-            <input
-              className="rounded-lg border border-slate-300 px-3 py-2"
-              placeholder="Contact (email/slack)"
-              value={contact}
-              onChange={(event) => setContact(event.target.value)}
-              required
-            />
-            <select
-              className="rounded-lg border border-slate-300 px-3 py-2"
-              value={urgency}
-              onChange={(event) => setUrgency(event.target.value)}
-            >
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-            </select>
-            <textarea
-              className="rounded-lg border border-slate-300 px-3 py-2"
-              placeholder="Notes"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              rows={4}
-            />
-            <button className="lp-button lp-button-primary w-fit" disabled={fixLoading} type="submit">
-              {fixLoading ? "Submitting..." : "Submit Fix Request"}
+          <div className="mt-5">
+            <button type="button" className="lp-button lp-button-primary" onClick={() => setShowNotifyModal(true)}>
+              Notify maintainer
             </button>
-          </form>
+          </div>
         </section>
-      ) : null}
+      ) : (
+        <section className="co-noise-card rounded-2xl p-6">
+          <h2 className="text-xl font-semibold text-slate-100">Findings</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            Expand each finding for detail, hints, and remediation workflow actions.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {initialData.findings.length === 0 ? (
+              <li className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-300">
+                No findings for this scan.
+              </li>
+            ) : (
+              initialData.findings.map((finding) => {
+                const expanded = Boolean(expandedIds[finding.id]);
+                return (
+                  <li key={finding.id} className="rounded-xl border border-white/10 bg-white/5">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                      onClick={() => toggleExpanded(finding.id)}
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-slate-100">{finding.severity.toUpperCase()}</p>
+                        <p className="text-xs text-slate-400">{categoryFromFinding(finding)}</p>
+                      </div>
+                      <span className="text-xs text-slate-400">{expanded ? "Collapse" : "Expand"}</span>
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {expanded ? (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden border-t border-white/10 px-4 py-3 text-sm text-slate-200"
+                        >
+                          <p>{finding.riskSummary}</p>
+                          <p className="mt-2 text-slate-300">Hint: {finding.hint}</p>
+                          <p className="mt-1 text-xs text-slate-400">Confidence: {finding.confidence}</p>
+                        </motion.div>
+                      ) : null}
+                    </AnimatePresence>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button type="button" className="lp-button lp-button-primary" onClick={onRescan} disabled={isRescanning}>
+              {isRescanning ? "Rescanning..." : "Rescan"}
+            </button>
+            {ffFix ? (
+              <button type="button" className="lp-button lp-button-ghost" onClick={onRequestFix} disabled={fixRequesting}>
+                {fixRequesting ? "Requesting..." : "Request Fix"}
+              </button>
+            ) : null}
+            {canIssueCertificate ? (
+              <button type="button" className="lp-button lp-button-ghost" onClick={onIssueCertificate} disabled={isIssuing}>
+                {isIssuing ? "Issuing..." : "Issue Certificate"}
+              </button>
+            ) : null}
+          </div>
+        </section>
+      )}
+
+      {actionMessage ? <p className="text-sm text-slate-300">{actionMessage}</p> : null}
+
+      <Link
+        className="inline-flex items-center text-sm text-cyan-200 no-underline hover:underline"
+        href={`/r/${initialData.scan.id}`}
+      >
+        Open public report summary →
+      </Link>
+
+      <AnimatePresence>
+        {showNotifyModal ? (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ y: 18, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 18, opacity: 0 }}
+              className="co-noise-card w-full max-w-2xl rounded-2xl p-6"
+            >
+              <h3 className="text-xl font-semibold text-slate-100">Notify maintainer</h3>
+              <p className="mt-1 text-sm text-slate-300">
+                Share a concise security notification without exposing sensitive report details.
+              </p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-slate-300">
+                  Sender GitHub Username
+                  <input
+                    className="mt-1 w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-slate-100"
+                    value={senderGhUsername}
+                    onChange={(event) => setSenderGhUsername(event.target.value)}
+                  />
+                </label>
+                <label className="text-xs text-slate-300">
+                  Gift Code
+                  <input
+                    className="mt-1 w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-slate-100"
+                    value={giftCode}
+                    onChange={(event) => setGiftCode(event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-200">
+                {notifyTemplate}
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <CopyButton value={notifyTemplate} label="Copy message" />
+                <button type="button" className="lp-button lp-button-ghost" onClick={() => setShowNotifyModal(false)}>
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </main>
   );
 }

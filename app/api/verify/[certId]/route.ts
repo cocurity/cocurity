@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolveCertificateStatus } from "@/lib/status";
+import { fetchDefaultBranchAndCommit, parseGitHubRepoUrl } from "@/lib/scanner";
 
 type Props = { params: Promise<{ certId: string }> };
 
@@ -19,7 +20,21 @@ export async function GET(_: Request, { params }: Props) {
     });
   }
 
-  const status = resolveCertificateStatus(certificate);
+  const baseStatus = resolveCertificateStatus(certificate);
+  let status: "valid" | "outdated" | "invalid" = "valid";
+
+  if (baseStatus !== "valid") {
+    status = "invalid";
+  } else {
+    try {
+      const parsed = parseGitHubRepoUrl(certificate.scanRun.repoUrl);
+      const { commitHash: latestCommitHash } = await fetchDefaultBranchAndCommit(parsed.owner, parsed.repo);
+      status = latestCommitHash === certificate.scanRun.commitHash ? "valid" : "outdated";
+    } catch {
+      status = "valid";
+    }
+  }
+
   return NextResponse.json({
     status,
     certificate: {

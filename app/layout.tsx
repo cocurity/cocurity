@@ -16,8 +16,8 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "LaunchPass",
-  description: "Pre-launch security checker MVP",
+  title: "Cocurity",
+  description: "Cocurity security workspace",
 };
 
 export default function RootLayout({
@@ -32,12 +32,14 @@ export default function RootLayout({
           <div className="lp-topbar-inner">
             <Link href="/" className="lp-brand">
               <span className="lp-brand-dot" />
-              LaunchPass Security Console
+              Cocurity
             </Link>
             <nav className="lp-nav">
-              <Link href="/scan">Scan</Link>
+              <Link href="/">Home</Link>
+              <Link href="/scan">Scans</Link>
+              <Link href="/r/demo-report">Reports</Link>
               <Link href="/verify">Verify</Link>
-              <Link href="/changelog">Changelog</Link>
+              <Link href="/ui">UI</Link>
             </nav>
           </div>
         </header>

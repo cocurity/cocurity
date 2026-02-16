@@ -1,43 +1,57 @@
 import Link from "next/link";
-import ScanHistoryPanel from "./ScanHistoryPanel";
+import HeroScene from "@/components/home/HeroScene";
+import ModeTiltCard from "@/components/home/ModeTiltCard";
+import PageTransition from "@/components/home/PageTransition";
 
 export default function HomePage() {
   return (
-    <main className="space-y-8">
-      <section className="lp-panel lp-panel-hero space-y-5 p-8">
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="lp-badge lp-badge-ready">PROTECTION ACTIVE</span>
-          <span className="lp-badge">Repository Security Assessment</span>
-          <span className="lp-badge">Certificate Verification</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span
-            className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-600 text-4xl font-black text-white shadow-sm sm:h-20 sm:w-20 sm:text-5xl"
-            aria-hidden
-          >
-            ✓
-          </span>
-          <h1
-            className="bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-5xl font-bold leading-[0.9] tracking-tight text-transparent sm:text-7xl"
-            style={{ fontFamily: "var(--font-space), sans-serif" }}
-          >
-            Launch Pass
-          </h1>
-        </div>
-        <p className="max-w-2xl text-sm text-slate-700">
-          Pre-launch security checks. Diagnostic reports & remediation. Certificate-based security notarization.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <Link className="lp-button lp-button-primary text-base" href="/scan">
-            Start Scan
-          </Link>
-          <Link className="lp-button lp-button-ghost" href="/verify">
-            Search Certificates
-          </Link>
-        </div>
-      </section>
+    <PageTransition>
+      <main className="space-y-8">
+        <section className="relative overflow-hidden rounded-[28px] border border-white/15 p-8 shadow-2xl">
+          <HeroScene />
+          <div className="relative z-10">
+            <p className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs uppercase tracking-[0.2em] text-slate-200">
+              Code Security Service
+            </p>
+            <h1
+              className="mt-5 max-w-3xl bg-gradient-to-r from-cyan-200 via-violet-200 to-cyan-100 bg-clip-text text-6xl font-bold leading-tight tracking-tight text-transparent sm:text-7xl"
+              style={{ fontFamily: "var(--font-space), sans-serif" }}
+            >
+              Cocurity
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm text-slate-200">
+              Before you ship it. Before you clone it. Verify it.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link className="lp-button lp-button-primary" href="/scan">
+                Start Audit
+              </Link>
+              <Link className="lp-button lp-button-ghost" href="/verify">
+                Verify Certificate
+              </Link>
+            </div>
+          </div>
+        </section>
 
-      <ScanHistoryPanel />
-    </main>
+        <section className="grid gap-4 sm:grid-cols-2">
+          <ModeTiltCard
+            title="Pre-Launch Security Audit"
+            summary="Identify critical risks before you ship to production."
+            cta="Before Launch"
+            href="/scan"
+            accent="cyan"
+            tag="<Before Launch>"
+          />
+          <ModeTiltCard
+            title="Dependency Risk Check"
+            summary="Assess security risks before you clone or integrate."
+            cta="Before Clone"
+            href="/scan?mode=dependency"
+            accent="violet"
+            tag="<Before Clone>"
+          />
+        </section>
+      </main>
+    </PageTransition>
   );
 }

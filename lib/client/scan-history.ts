@@ -3,6 +3,7 @@
 export type ScanHistoryItem = {
   scanId: string;
   repoUrl: string;
+  mode?: "audit" | "dependency";
   score?: number;
   grade?: string;
   verdict?: string;
