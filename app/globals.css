@@ -4,28 +4,76 @@
 
 :root {
   color-scheme: light;
-  --lp-bg: #f7f7f0;
-  --lp-panel: #fffef6;
-  --lp-ink: #101418;
-  --lp-soft: #5b6570;
-  --lp-accent: #0f7b6c;
-  --lp-warn: #ad7f00;
-  --lp-danger: #9c2a2a;
+  --lp-bg: #f4f7fb;
+  --lp-ink: #0f172a;
+  --lp-panel: #ffffff;
+  --lp-border: #dbe3ef;
+  --lp-accent: #2563eb;
+  --lp-safe: #0f766e;
+  --lp-caution: #a16207;
+  --lp-risk: #b91c1c;
+  --lp-nav: #0b1220;
 }
 
 body {
   min-height: 100vh;
   color: var(--lp-ink);
   background:
-    radial-gradient(1200px 600px at 0% 0%, #d7efe8 0%, transparent 60%),
-    radial-gradient(1000px 500px at 100% 100%, #f2e8d0 0%, transparent 60%),
+    radial-gradient(1000px 500px at 0% -20%, rgba(37, 99, 235, 0.14) 0%, transparent 60%),
+    radial-gradient(900px 400px at 100% -20%, rgba(15, 118, 110, 0.1) 0%, transparent 55%),
     var(--lp-bg);
-  @apply antialiased;
+  font-family: var(--font-jakarta), sans-serif;
+  @apply antialiased leading-relaxed;
 }
 
 a {
   @apply underline-offset-2 hover:underline;
-  color: #0a5764;
+  color: #0e54a6;
+}
+
+.lp-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: color-mix(in oklab, var(--lp-nav), transparent 6%);
+  border-bottom: 1px solid #1c2940;
+  backdrop-filter: blur(8px);
+}
+
+.lp-topbar-inner {
+  @apply mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3;
+}
+
+.lp-brand {
+  @apply inline-flex items-center gap-2 text-sm font-semibold no-underline;
+  color: #e5eef9;
+}
+
+.lp-brand:hover {
+  color: #f8fbff;
+}
+
+.lp-brand-dot {
+  height: 10px;
+  width: 10px;
+  border-radius: 999px;
+  background: #20c997;
+  box-shadow: 0 0 0 3px rgba(32, 201, 151, 0.18);
+}
+
+.lp-nav {
+  @apply flex items-center gap-3 text-xs;
+  font-family: var(--font-space), sans-serif;
+}
+
+.lp-nav a {
+  @apply rounded px-2 py-1 no-underline;
+  color: #b6c9e3;
+}
+
+.lp-nav a:hover {
+  color: #f2f7fd;
+  background: rgba(182, 201, 227, 0.12);
 }
 
 .lp-shell {
@@ -34,8 +82,17 @@ a {
 
 .lp-panel {
   background: var(--lp-panel);
-  border: 1px solid #dde2d1;
-  @apply rounded-2xl shadow-sm;
+  border: 1px solid var(--lp-border);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 36, 0.03),
+    0 10px 24px rgba(15, 23, 36, 0.04);
+  @apply rounded-xl;
+}
+
+.lp-panel-hero {
+  background:
+    linear-gradient(130deg, rgba(37, 99, 235, 0.08), rgba(15, 118, 110, 0.03)),
+    var(--lp-panel);
 }
 
 .lp-button {
@@ -43,35 +100,38 @@ a {
 }
 
 .lp-button-primary {
-  background: var(--lp-ink);
-  color: #f8fafc;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  color: #f8fbff;
+  border: 1px solid #1d4ed8;
 }
 
 .lp-button-primary:hover {
-  opacity: 0.92;
+  filter: brightness(1.05);
 }
 
 .lp-button-ghost {
-  background: #eff3e7;
+  border: 1px solid #cad5e3;
+  background: #f7faff;
   color: var(--lp-ink);
 }
 
 .lp-badge {
   @apply inline-flex rounded-full px-3 py-1 text-xs font-semibold;
-  background: #e8ece0;
+  background: #edf2fb;
+  color: #1e3a5f;
 }
 
 .lp-badge-ready {
-  background: #d7f0da;
-  color: #14532d;
+  background: color-mix(in oklab, var(--lp-safe), white 84%);
+  color: #0b6b48;
 }
 
 .lp-badge-caution {
-  background: #f8e9c2;
-  color: #78350f;
+  background: color-mix(in oklab, var(--lp-caution), white 84%);
+  color: #8a5a17;
 }
 
 .lp-badge-block {
-  background: #f8d4d4;
-  color: #7f1d1d;
+  background: color-mix(in oklab, var(--lp-risk), white 86%);
+  color: #9e2a2a;
 }

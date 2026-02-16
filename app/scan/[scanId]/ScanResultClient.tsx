@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { upsertScanHistoryItem } from "@/lib/client/scan-history";
 
 type Finding = {
   id: string;
@@ -50,12 +51,20 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
         const res = await fetch(`/api/scan/${scanId}`, { cache: "no-store" });
         const body = (await res.json()) as ScanResponse & { error?: string };
         if (!res.ok) {
-          setError(body.error ?? "스캔 결과를 불러오지 못했습니다.");
+          setError(body.error ?? "Failed to load scan result.");
           return;
         }
         setData(body);
+        upsertScanHistoryItem({
+          scanId: body.scan.id,
+          repoUrl: body.scan.repoUrl,
+          score: body.scan.score,
+          grade: body.scan.grade,
+          verdict: body.scan.verdict,
+          createdAt: new Date().toISOString(),
+        });
       } catch {
-        setError("네트워크 문제로 결과를 불러오지 못했습니다.");
+        setError("Network error while loading scan result.");
       } finally {
         setLoading(false);
       }
@@ -77,13 +86,13 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
       const res = await fetch(`/api/scan/${scanId}/rescan`, { method: "POST" });
       const body = (await res.json()) as { scanId?: string; error?: string };
       if (!res.ok || !body.scanId) {
-        setActionMessage(body.error ?? "재검사 요청 실패");
+        setActionMessage(body.error ?? "Rescan request failed.");
         return;
       }
       router.push(`/scan/${body.scanId}`);
       router.refresh();
     } catch {
-      setActionMessage("재검사 중 네트워크 오류가 발생했습니다.");
+      setActionMessage("Network error while requesting rescan.");
     } finally {
       setRescanLoading(false);
     }
@@ -100,12 +109,12 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
       });
       const body = (await res.json()) as { certId?: string; error?: string };
       if (!res.ok || !body.certId) {
-        setActionMessage(body.error ?? "인증서 발급 실패");
+        setActionMessage(body.error ?? "Certificate issuance failed.");
         return;
       }
       router.push(`/verify/${body.certId}`);
     } catch {
-      setActionMessage("인증서 발급 중 네트워크 오류가 발생했습니다.");
+      setActionMessage("Network error while issuing certificate.");
     } finally {
       setCertLoading(false);
     }
@@ -123,15 +132,15 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
       });
       const body = (await res.json()) as { requestId?: string; error?: string };
       if (!res.ok || !body.requestId) {
-        setActionMessage(body.error ?? "Fix Request 전송 실패");
+        setActionMessage(body.error ?? "Fix request submission failed.");
         return;
       }
-      setActionMessage(`Fix Request 접수됨: ${body.requestId}`);
+      setActionMessage(`Fix request submitted: ${body.requestId}`);
       setContact("");
       setNotes("");
       setUrgency("medium");
     } catch {
-      setActionMessage("Fix Request 전송 중 네트워크 오류가 발생했습니다.");
+      setActionMessage("Network error while submitting fix request.");
     } finally {
       setFixLoading(false);
     }
@@ -157,7 +166,7 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
         <div className="lp-panel space-y-3 p-6">
           <p className="text-sm text-red-700">{error}</p>
           <button className="lp-button lp-button-primary" onClick={() => location.reload()} type="button">
-            다시 시도
+            Retry
           </button>
         </div>
       </main>
@@ -168,7 +177,7 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
     return (
       <main className="space-y-4">
         <h1 className="text-2xl font-semibold">Scan Result</h1>
-        <div className="lp-panel p-6 text-sm text-slate-700">데이터가 비어 있습니다.</div>
+        <div className="lp-panel p-6 text-sm text-slate-700">No scan data available.</div>
       </main>
     );
   }
@@ -178,6 +187,11 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
   return (
     <main className="space-y-6">
       <section className="lp-panel p-6">
+        <div className="mb-3 flex flex-wrap gap-2 text-xs">
+          <span className="lp-badge">Analysis Completed</span>
+          <span className="lp-badge">Risk Classification Applied</span>
+          <span className="lp-badge">Immutable Commit Snapshot</span>
+        </div>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold">Scan Result</h1>
@@ -220,9 +234,9 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
             Verify Search
           </Link>
         </div>
-        {!ffCert ? <p className="text-xs text-slate-600">Certificate 기능은 현재 비활성화되어 있습니다.</p> : null}
+        {!ffCert ? <p className="text-xs text-slate-600">Certificate feature is currently disabled.</p> : null}
         {ffCert && data.scan.criticalCount > 0 ? (
-          <p className="text-xs text-slate-600">Critical 이슈가 있으면 인증서 발급이 불가합니다.</p>
+          <p className="text-xs text-slate-600">Certificate issuance requires zero critical findings.</p>
         ) : null}
         {actionMessage ? <p className="mt-2 text-sm text-slate-700">{actionMessage}</p> : null}
       </section>
@@ -230,7 +244,7 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Findings ({data.findings.length})</h2>
         {data.findings.length === 0 ? (
-          <div className="lp-panel p-4 text-sm text-slate-700">발견된 이슈가 없습니다.</div>
+          <div className="lp-panel p-4 text-sm text-slate-700">No findings detected.</div>
         ) : (
           <ul className="space-y-3">
             {data.findings.map((finding) => (
@@ -257,7 +271,7 @@ export default function ScanResultClient({ scanId }: { scanId: string }) {
       {ffFix ? (
         <section id="fix-request" className="lp-panel p-6">
           <h2 className="text-xl font-semibold">Fix Request</h2>
-          <p className="mt-1 text-sm text-slate-700">결과 기반 수정 지원 요청을 접수합니다.</p>
+          <p className="mt-1 text-sm text-slate-700">Submit a remediation support request based on this scan result.</p>
           <form className="mt-4 grid gap-3 sm:max-w-xl" onSubmit={onFixRequestSubmit}>
             <input
               className="rounded-lg border border-slate-300 px-3 py-2"

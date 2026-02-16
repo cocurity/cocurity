@@ -2,12 +2,13 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { upsertScanHistoryItem } from "@/lib/client/scan-history";
 
 const STEP_LABELS = [
-  "Repository URL 확인 중",
-  "기본 브랜치/커밋 조회 중",
-  "파일 트리 스캔 중",
-  "리스크 점수 계산 중",
+  "Validating repository URL",
+  "Fetching default branch and latest commit",
+  "Scanning repository file tree",
+  "Calculating risk score",
 ];
 
 export default function ScanForm() {
@@ -44,6 +45,11 @@ export default function ScanForm() {
         setError(data.error ?? "Scan failed.");
         return;
       }
+      upsertScanHistoryItem({
+        scanId: data.scanId,
+        repoUrl,
+        createdAt: new Date().toISOString(),
+      });
       router.push(`/scan/${data.scanId}`);
     } catch {
       setError("Network error while creating scan.");
@@ -57,7 +63,7 @@ export default function ScanForm() {
       <label className="block space-y-1">
         <span className="text-sm font-medium">Public GitHub Repository URL</span>
         <input
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+          className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2"
           placeholder="https://github.com/org/repo"
           value={repoUrl}
           onChange={(event) => setRepoUrl(event.target.value)}
@@ -69,11 +75,11 @@ export default function ScanForm() {
         disabled={isSubmitting}
         type="submit"
       >
-        {isSubmitting ? "검사 진행 중..." : "검사 시작"}
+        {isSubmitting ? "Scanning..." : "Start Scan"}
       </button>
       {isSubmitting ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-3">
-          <p className="text-sm font-medium">{activeStep}</p>
+          <p className="text-sm font-medium">[SCANNER] {activeStep}</p>
           <div className="mt-2 h-2 w-full overflow-hidden rounded bg-slate-200">
             <div className="h-full w-1/3 animate-pulse rounded bg-slate-700" />
           </div>
