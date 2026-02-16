@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Severity {
+  CRITICAL
+  WARNING
+}
+
+enum Confidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum Grade {
+  READY
+  CAUTION
+  BLOCK
+}
+
+enum Verdict {
+  LAUNCH_READY
+  BLOCKED
+}
+
+enum CertificateStatus {
+  VALID
+  REVOKED
+  EXPIRED
+}
+
+model Project {
+  id                String        @id @default(cuid())
+  repoUrl           String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  scanRuns          ScanRun[]
+
+  @@index([repoUrl])
+}
+
+model ScanRun {
+  id          String     @id @default(cuid())
+  projectId   String
+  repoUrl     String
+  commitHash  String
+  scanConfigVersion String
+  score       Int
+  grade       Grade
+  verdict     Verdict
+  criticalCount Int
+  warningCount Int
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  findings    Finding[]
+  certificates Certificate[]
+  fixRequests FixRequest[]
+
+  @@index([repoUrl])
+  @@index([commitHash])
+  @@index([repoUrl, commitHash, scanConfigVersion])
+}
+
+model Finding {
+  id          String     @id @default(cuid())
+  scanRunId   String
+  severity    Severity
+  location    String
+  riskSummary String
+  hint        String
+  confidence  Confidence
+  createdAt   DateTime   @default(now())
+  scanRun     ScanRun    @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+
+  @@index([scanRunId])
+}
+
+model Certificate {
+  id        String   @id @default(cuid())
+  certId    String   @unique
+  scanRunId String
+  status    CertificateStatus @default(VALID)
+  pngPath   String
+  verifyUrl String
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  scanRun   ScanRun  @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+
+  @@index([certId])
+  @@index([scanRunId])
+}
+
+model FixRequest {
+  id        String   @id @default(cuid())
+  scanRunId String
+  contact   String
+  urgency   String
+  notes     String
+  createdAt DateTime @default(now())
+  scanRun   ScanRun  @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+
+  @@index([scanRunId])
+}
