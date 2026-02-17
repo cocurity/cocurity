@@ -2,8 +2,10 @@ import { randomBytes } from "node:crypto";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { put } from "@vercel/blob";
-import { Resvg } from "@resvg/resvg-js";
+import { Resvg, type ResvgRenderOptions } from "@resvg/resvg-js";
 import QRCode from "qrcode";
+
+type FontOptions = NonNullable<ResvgRenderOptions["font"]> & { fontBuffers?: Buffer[] };
 
 let fontCache: { regular: Buffer; bold: Buffer; regularB64: string; boldB64: string } | null = null;
 
@@ -114,17 +116,14 @@ export async function renderCertificateImage(input: CertificateRenderInput) {
   const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
 
   try {
-    const fontsDir = join(process.cwd(), "assets", "fonts");
+    const font: FontOptions = {
+      fontBuffers: [fonts.regular, fonts.bold],
+      loadSystemFonts: false,
+      defaultFontFamily: "Inter",
+    };
     const resvg = new Resvg(svg, {
       fitTo: { mode: "width", value: 1200 },
-      font: {
-        fontFiles: [
-          join(fontsDir, "Inter-Regular.woff2"),
-          join(fontsDir, "Inter-Bold.woff2"),
-        ],
-        loadSystemFonts: false,
-        defaultFontFamily: "Inter",
-      },
+      font,
     });
     const pngBuffer = Buffer.from(resvg.render().asPng());
 
