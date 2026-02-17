@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import StatTiles from "@/components/ui/StatTiles";
@@ -16,7 +15,6 @@ type Finding = {
   riskSummary: string;
   hint: string;
   confidence: "high" | "medium" | "low";
-  source?: "RULE" | "AI";
 };
 
 type ScanPayload = {
@@ -30,7 +28,6 @@ type ScanPayload = {
     warningCount: number;
     commitHash: string;
     createdAt: string;
-    aiEnabled?: boolean;
   };
   findings: Finding[];
 };
@@ -69,7 +66,6 @@ export default function ScanResultClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, status: sessionStatus } = useSession();
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
@@ -77,17 +73,9 @@ export default function ScanResultClient({
   const [showGiftOptions, setShowGiftOptions] = useState(false);
   const [giftFixPass, setGiftFixPass] = useState(true);
   const [giftCertPass, setGiftCertPass] = useState(true);
+  const [giftEmail, setGiftEmail] = useState("");
+  const [giftProcessing, setGiftProcessing] = useState(false);
   const [showPaymentDoneModal, setShowPaymentDoneModal] = useState(false);
-  const [upgradeTimerFired, setUpgradeTimerFired] = useState(false);
-  const [upgradeDismissed, setUpgradeDismissed] = useState(false);
-  const [userPlan, setUserPlan] = useState<string | null>(null);
-
-  const isPaidPlan = userPlan === "PLUS" || userPlan === "PRO";
-  const showUpgradeModal =
-    upgradeTimerFired &&
-    !upgradeDismissed &&
-    !isPaidPlan &&
-    !initialData.scan.aiEnabled;
 
   const ffCert = process.env.NEXT_PUBLIC_FF_CERT_ENABLED === "1";
 
@@ -110,34 +98,6 @@ export default function ScanResultClient({
         `Hi maintainer of ${repoName}, Cocurity found potential security issues.`,
         `View report: https://cocurity.com/r/${reportId}`,
       ].join("\n");
-
-  useEffect(() => {
-    if (initialData.scan.aiEnabled) return;
-    if (sessionStatus === "loading") return;
-
-    if (sessionStatus === "unauthenticated") {
-      const timer = window.setTimeout(() => setUpgradeTimerFired(true), 2500);
-      return () => window.clearTimeout(timer);
-    }
-
-    let cancelled = false;
-    let delayTimer: number | null = null;
-    fetch("/api/subscription")
-      .then((res) => res.json())
-      .then((data: { plan?: string }) => {
-        if (cancelled) return;
-        const plan = data.plan ?? "FREE";
-        setUserPlan(plan);
-        if (plan === "FREE") {
-          delayTimer = window.setTimeout(() => setUpgradeTimerFired(true), 2000);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-      if (delayTimer) clearTimeout(delayTimer);
-    };
-  }, [sessionStatus, initialData.scan.aiEnabled]);
 
   useEffect(() => {
     if (!giftPurchased) return;
@@ -191,39 +151,49 @@ export default function ScanResultClient({
     }
   }
 
-  function requireAuth(next: () => void) {
-    if (!session?.user) {
-      const current = `/scan/${initialData.scan.id}?mode=${mode}`;
-      router.push(`/login?callbackUrl=${encodeURIComponent(current)}`);
+  async function onGiftCheckout() {
+    if (!giftEmail.trim()) {
+      setActionMessage("Please enter your email address.");
       return;
     }
-    next();
-  }
+    if (!giftFixPass && !giftCertPass) {
+      setActionMessage("Select at least one gift pass.");
+      return;
+    }
 
-  function onGiftCheckout() {
-    requireAuth(() => {
-      const returnTo = `/scan/${initialData.scan.id}?mode=${mode}&gift_paid=1`;
-      const href =
-        `/pricing?plan=pro&context=gift` +
-        `&returnTo=${encodeURIComponent(returnTo)}` +
-        `&scanId=${encodeURIComponent(initialData.scan.id)}` +
-        `&repoUrl=${encodeURIComponent(initialData.scan.repoUrl)}` +
-        `&giftFix=${giftFixPass ? "1" : "0"}` +
-        `&giftCert=${giftCertPass ? "1" : "0"}`;
-      router.push(href);
-    });
+    setGiftProcessing(true);
+    try {
+      const res = await fetch("/api/checkout/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "payment",
+          email: giftEmail.trim(),
+          scanId: initialData.scan.id,
+          repoUrl: initialData.scan.repoUrl,
+          giftFix: giftFixPass,
+          giftCert: giftCertPass,
+        }),
+      });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        setActionMessage(data.error ?? "Failed to create checkout session.");
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
+      setActionMessage("Network error. Please try again.");
+    } finally {
+      setGiftProcessing(false);
+    }
   }
 
   function onCocourityFixCheckout() {
-    requireAuth(() => {
-      const returnTo = `/scan/${initialData.scan.id}?mode=${mode}`;
-      router.push(
-        `/pricing?context=gift&plan=pro&giftFix=1&giftCert=0` +
-          `&scanId=${encodeURIComponent(initialData.scan.id)}` +
-          `&repoUrl=${encodeURIComponent(initialData.scan.repoUrl)}` +
-          `&returnTo=${encodeURIComponent(returnTo)}`
-      );
-    });
+    router.push(
+      `/pricing?context=gift&plan=pro&giftFix=1&giftCert=0` +
+        `&scanId=${encodeURIComponent(initialData.scan.id)}` +
+        `&repoUrl=${encodeURIComponent(initialData.scan.repoUrl)}`
+    );
   }
 
   return (
@@ -282,29 +252,10 @@ export default function ScanResultClient({
         </section>
       ) : (
         <section className="co-noise-card rounded-2xl p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-100">Findings</h2>
-            {initialData.scan.aiEnabled && (
-              <span className="rounded-lg border border-violet-300/30 bg-violet-400/15 px-2 py-1 text-xs font-semibold text-violet-200">
-                AI-Enhanced
-              </span>
-            )}
-          </div>
+          <h2 className="text-xl font-semibold text-slate-100">Findings</h2>
           <p className="mt-1 text-sm text-slate-300">
             Expand each finding for detail, hints, and remediation workflow actions.
           </p>
-
-          {!initialData.scan.aiEnabled && initialData.findings.length > 0 && (
-            <div className="mt-3 flex items-center gap-3 rounded-xl border border-violet-300/20 bg-violet-400/5 px-4 py-3">
-              <p className="text-sm text-violet-100">
-                Unlock deeper AI-powered analysis with Plus or Pro.
-              </p>
-              <Link href="/pricing" className="shrink-0 text-sm font-semibold text-violet-200 hover:underline">
-                Upgrade
-              </Link>
-            </div>
-          )}
-
           <ul className="mt-4 space-y-3">
             {initialData.findings.length === 0 ? (
               <li className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-300">
@@ -320,13 +271,8 @@ export default function ScanResultClient({
                       className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                       onClick={() => toggleExpanded(finding.id)}
                     >
-                      <div className="flex items-center gap-2">
+                      <div>
                         <p className="text-sm font-semibold text-slate-100">{finding.severity.toUpperCase()}</p>
-                        {finding.source === "AI" && (
-                          <span className="rounded-md border border-violet-300/30 bg-violet-400/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-200">
-                            AI
-                          </span>
-                        )}
                         <p className="text-xs text-slate-400">{categoryFromFinding(finding)}</p>
                       </div>
                       <span className="text-xs text-slate-400">{expanded ? "Collapse" : "Expand"}</span>
@@ -475,14 +421,26 @@ export default function ScanResultClient({
                       </span>
                     </label>
                   </div>
+                  <div className="mt-3">
+                    <label className="text-xs text-slate-300">
+                      Your email
+                      <input
+                        type="email"
+                        value={giftEmail}
+                        onChange={(event) => setGiftEmail(event.target.value)}
+                        placeholder="security@company.com"
+                        className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-slate-100 outline-none"
+                      />
+                    </label>
+                  </div>
                   <div className="mt-4">
                     <button
                       type="button"
                       className="lp-button lp-button-primary"
                       onClick={onGiftCheckout}
-                      disabled={!giftFixPass && !giftCertPass}
+                      disabled={giftProcessing || (!giftFixPass && !giftCertPass)}
                     >
-                      Gift now
+                      {giftProcessing ? "Redirecting..." : "Gift now"}
                     </button>
                   </div>
                 </div>
@@ -524,81 +482,6 @@ export default function ScanResultClient({
               <div className="mt-5">
                 <button type="button" className="lp-button lp-button-primary" onClick={() => setShowPaymentDoneModal(false)}>
                   닫기
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showUpgradeModal ? (
-          <motion.div
-            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 px-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              initial={{ y: 20, opacity: 0, scale: 0.97 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 20, opacity: 0, scale: 0.97 }}
-              className="co-noise-card w-full max-w-lg rounded-2xl p-6"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="inline-flex rounded-lg border border-violet-300/30 bg-violet-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-200">
-                    Premium
-                  </span>
-                  <h3 className="mt-3 text-xl font-semibold text-slate-100">
-                    Get deeper insights with AI scanning
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  className="text-slate-400 hover:text-slate-200"
-                  onClick={() => setUpgradeDismissed(true)}
-                >
-                  <span className="sr-only">Close</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                </button>
-              </div>
-
-              <p className="mt-3 text-sm text-slate-300">
-                Your scan found {initialData.scan.criticalCount + initialData.scan.warningCount} issue{initialData.scan.criticalCount + initialData.scan.warningCount !== 1 ? "s" : ""} using rule-based detection.
-                AI-enhanced scanning can uncover hidden vulnerabilities that regex patterns miss.
-              </p>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-cyan-200/20 bg-white/5 p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-slate-400">Plus</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-100">$19<span className="text-sm font-normal text-slate-400">/mo</span></p>
-                  <ul className="mt-3 space-y-1 text-xs text-slate-300">
-                    <li>AI-enhanced scanning</li>
-                    <li>300 scans/month</li>
-                    <li>2,000 files/scan</li>
-                  </ul>
-                </div>
-                <div className="rounded-xl border border-amber-200/30 bg-amber-400/5 p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-amber-200">Pro</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-100">$49<span className="text-sm font-normal text-slate-400">/mo</span></p>
-                  <ul className="mt-3 space-y-1 text-xs text-slate-300">
-                    <li>AI-enhanced scanning</li>
-                    <li>2,000 scans/month</li>
-                    <li>Priority support</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="mt-5 flex gap-2">
-                <Link
-                  href={`/pricing?plan=pro&returnTo=${encodeURIComponent(`/scan/${initialData.scan.id}?mode=${mode}`)}`}
-                  className="lp-button lp-button-primary no-underline"
-                >
-                  Upgrade now
-                </Link>
-                <button type="button" className="lp-button lp-button-ghost" onClick={() => setUpgradeDismissed(true)}>
-                  Maybe later
                 </button>
               </div>
             </motion.div>
