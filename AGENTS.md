@@ -31,6 +31,7 @@ Read this file first. These rules are the project source of truth for coding age
 - `/verify`
 - `/verify/[certId]`
 - `/pricing`
+- `/pricing/success`
 - `/mypage`
 - `/changelog`
 - `/ui`
@@ -42,6 +43,10 @@ Read this file first. These rules are the project source of truth for coding age
 - `POST /api/certificate` `{ scanId } -> { certId }`
 - `GET /api/verify/:certId` `-> { status, certificate, scanSummary }`
 - `POST /api/fix-request` `{ scanId, contact, urgency, notes } -> { requestId }`
+- `POST /api/checkout/session` `{ mode, email, ... } -> { url, sessionId }`
+- `GET /api/checkout/session/verify` `?session_id -> { type, status, amount, items }`
+- `POST /api/webhooks/stripe` Stripe webhook (signature verified)
+- `GET /api/orders` `?email -> { orders[] }`
 
 ## 6) Engineering Rules
 - Use TypeScript-safe changes.

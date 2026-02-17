@@ -12,7 +12,7 @@ Provide a polished end-to-end flow for public repository security checks:
 2. User views result at `/scan/[scanId]`.
 3. User opens issue report `/r/[reportId]`.
 4. User verifies certificate via `/verify` and `/verify/[certId]`.
-5. User can start checkout from result actions (`Cocourity Fix`) and complete simulated payment at `/pricing`.
+5. User can start checkout from result actions (`Cocourity Fix`) and complete payment via Stripe Checkout at `/pricing`.
 6. User sees Cocurity Fix request statuses in `/mypage`.
 
 ## Current Acceptance Criteria
@@ -23,7 +23,7 @@ Provide a polished end-to-end flow for public repository security checks:
 4. Dependency mode supports maintainer notification modal.
 5. Gift checkout flow works:
    - select one-time gift options
-   - complete simulated payment
+   - complete payment via Stripe Checkout
    - return to result page with completion feedback.
 6. Certificate issuance works when critical findings are zero.
 7. Verify pages show trustworthy metadata + status (`valid`, `outdated`, `invalid`).
@@ -39,6 +39,10 @@ Provide a polished end-to-end flow for public repository security checks:
 - `POST /api/certificate` `{ scanId } -> { certId }`
 - `GET /api/verify/:certId` `-> { status, certificate, scanSummary }`
 - `POST /api/fix-request` `{ scanId, contact, urgency, notes } -> { requestId }`
+- `POST /api/checkout/session` `{ mode, email, ... } -> { url, sessionId }`
+- `GET /api/checkout/session/verify` `?session_id -> { type, status, amount, items }`
+- `POST /api/webhooks/stripe` Stripe webhook (signature verified)
+- `GET /api/orders` `?email -> { orders[] }`
 
 ## Scoring & Verdict Rules
 - Base: `100`
@@ -69,10 +73,9 @@ Provide a polished end-to-end flow for public repository security checks:
   - Cocurity Fix Pass `$149`
   - Certification Pass `$39`
   - bundle discount `$19` when both selected
-- Payment is simulated UI (Stripe-like), no real charge execution.
+- Payment processed via Stripe Checkout Session (real charges).
 
 ## Non-goals
-- Real payment processing and settlement
 - Private repo OAuth integration
 - Enterprise RBAC/user identity backend
 - Full remediation automation pipeline
