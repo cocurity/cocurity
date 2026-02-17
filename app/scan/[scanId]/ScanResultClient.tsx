@@ -163,6 +163,10 @@ export default function ScanResultClient({
 
     setGiftProcessing(true);
     try {
+      const items: string[] = [];
+      if (giftFixPass) items.push("fix-pass");
+      if (giftCertPass) items.push("cert-pass");
+
       const res = await fetch("/api/checkout/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,8 +175,7 @@ export default function ScanResultClient({
           email: giftEmail.trim(),
           scanId: initialData.scan.id,
           repoUrl: initialData.scan.repoUrl,
-          giftFix: giftFixPass,
-          giftCert: giftCertPass,
+          items,
         }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
