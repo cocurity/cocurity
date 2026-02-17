@@ -1,6 +1,6 @@
 import { Confidence, Severity } from "@prisma/client";
 
-export const SCAN_CONFIG_VERSION = "v2";
+export const SCAN_CONFIG_VERSION = "v1";
 const MAX_FILES_SCANNED = 200;
 const MAX_FETCHED_TEXT_BYTES = 2 * 1024 * 1024;
 const MAX_SINGLE_FILE_BYTES = 256 * 1024;
