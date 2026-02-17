@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev",
+    "dev:up": "docker compose up -d --wait && npx prisma migrate deploy && next dev",
+    "dev:reset": "docker compose up -d --wait && npx prisma migrate reset --force",
+    "dev:down": "docker compose down",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -27,6 +30,9 @@
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.4.1",
     "three": "^0.182.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
