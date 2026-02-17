@@ -122,6 +122,7 @@ export async function renderCertificateImage(input: CertificateRenderInput) {
           join(fontsDir, "Inter-Regular.woff2"),
           join(fontsDir, "Inter-Bold.woff2"),
         ],
+        loadSystemFonts: false,
         defaultFontFamily: "Inter",
       },
     });
