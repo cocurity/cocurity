@@ -1,6 +1,6 @@
 import { Confidence, Severity } from "@prisma/client";
 
-export const SCAN_CONFIG_VERSION = "v1";
+export const SCAN_CONFIG_VERSION = "v2";
 const MAX_FILES_SCANNED = 200;
 const MAX_FETCHED_TEXT_BYTES = 2 * 1024 * 1024;
 const MAX_SINGLE_FILE_BYTES = 256 * 1024;
@@ -26,6 +26,20 @@ const RISKY_CONFIG_PATTERNS = [
   /\bcors\s*:\s*\*/gi,
   /\bpublicRead\b/gi,
   /\ballow all\b/gi,
+];
+
+/* ── File context classification (Phase 1 FP reduction) ─────────────── */
+
+const SAFE_TEMPLATE_SUFFIXES = [".example", ".sample", ".template", ".dist", ".defaults"];
+
+const DOC_FILE_PATTERNS = [
+  /\.md$/i,
+  /\.mdx$/i,
+  /\.rst$/i,
+  /(^|\/)README(\.[^/]+)?$/i,
+  /(^|\/)CHANGELOG(\.[^/]+)?$/i,
+  /(^|\/)CONTRIBUTING(\.[^/]+)?$/i,
+  /(^|\/)LICENSE(\.[^/]+)?$/i,
 ];
 
 const TEXT_EXTENSIONS = new Set([
@@ -216,6 +230,15 @@ function isSensitivePath(path: string) {
   return SENSITIVE_FILENAME_PATTERNS.some((pattern) => pattern.test(path));
 }
 
+function isTemplateFile(path: string) {
+  const lower = path.toLowerCase();
+  return SAFE_TEMPLATE_SUFFIXES.some((suffix) => lower.endsWith(suffix));
+}
+
+function isDocFile(path: string) {
+  return DOC_FILE_PATTERNS.some((pattern) => pattern.test(path));
+}
+
 function isLikelyTextPath(path: string) {
   const file = path.split("/").pop() ?? "";
   const lower = file.toLowerCase();
@@ -268,8 +291,10 @@ export async function scanGitHubRepository(repoUrl: string) {
 
   for (const file of candidates) {
     const location = file.path;
+    const template = isTemplateFile(location);
+    const doc = isDocFile(location);
 
-    if (isSensitivePath(location)) {
+    if (isSensitivePath(location) && !template) {
       addFinding(findings, dedupe, {
         severity: Severity.CRITICAL,
         location,
@@ -305,25 +330,29 @@ export async function scanGitHubRepository(repoUrl: string) {
       pattern.regex.lastIndex = 0;
       if (pattern.regex.test(sanitized)) {
         addFinding(findings, dedupe, {
-          severity: Severity.CRITICAL,
+          severity: template ? Severity.WARNING : Severity.CRITICAL,
           location,
-          riskSummary: `Secret-like token pattern (${pattern.label}) detected in repository content.`,
+          riskSummary: template
+            ? `Secret-like token pattern (${pattern.label}) found in template file — verify no real credentials are committed.`
+            : `Secret-like token pattern (${pattern.label}) detected in repository content.`,
           hint: "Keep secrets in dedicated secret stores and rotate potentially exposed credentials.",
-          confidence: Confidence.HIGH,
+          confidence: template ? Confidence.LOW : Confidence.HIGH,
         });
       }
     }
 
-    for (const pattern of RISKY_CONFIG_PATTERNS) {
-      pattern.lastIndex = 0;
-      if (pattern.test(sanitized)) {
-        addFinding(findings, dedupe, {
-          severity: Severity.WARNING,
-          location,
-          riskSummary: "Risky configuration pattern may allow broader access than intended.",
-          hint: "Apply least-privilege defaults and validate security-sensitive configuration scope.",
-          confidence: Confidence.MEDIUM,
-        });
+    if (!doc) {
+      for (const pattern of RISKY_CONFIG_PATTERNS) {
+        pattern.lastIndex = 0;
+        if (pattern.test(sanitized)) {
+          addFinding(findings, dedupe, {
+            severity: Severity.WARNING,
+            location,
+            riskSummary: "Risky configuration pattern may allow broader access than intended.",
+            hint: "Apply least-privilege defaults and validate security-sensitive configuration scope.",
+            confidence: Confidence.MEDIUM,
+          });
+        }
       }
     }
   }
