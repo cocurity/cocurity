@@ -41,7 +41,8 @@ Fullstack MVP for repository security scanning, certificate verification, and fi
 - `POST /api/certificate` `{ scanId } -> { certId }`
 - `GET /api/verify/:certId` `-> { status, certificate, scanSummary }`
 - `POST /api/fix-request` `{ scanId, contact, urgency, notes } -> { requestId }`
-- `POST /api/checkout/session` `{ mode, email, ... } -> { url, sessionId }`
+- `GET /api/products` `-> { oneTime: Product[], subscription: Product[] }`
+- `POST /api/checkout/session` `{ mode, email, items|slug, ... } -> { url, sessionId }`
 - `GET /api/checkout/session/verify` `?session_id -> { type, status, amount, items }`
 - `POST /api/webhooks/stripe` Stripe webhook handler
 - `GET /api/orders` `?email -> { orders[] }`
@@ -81,7 +82,11 @@ Backend:
 - `STRIPE_SECRET_KEY` (Stripe server-side key)
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (Stripe client-side key)
 - `STRIPE_WEBHOOK_SECRET` (Stripe webhook signature verification)
-- `STRIPE_PRICE_FIX_PASS` / `STRIPE_PRICE_CERT_PASS` / `STRIPE_PRICE_PLUS_MONTHLY` / `STRIPE_PRICE_PRO_MONTHLY` (Stripe Price IDs)
+
+## Product Catalog Source
+- Products are managed in PostgreSQL via Prisma `Product` records.
+- Seed default products with `npx prisma db seed`.
+- Checkout session line items are built from DB products using Stripe `price_data`.
 
 ## Tech Stack
 - Next.js App Router + TypeScript

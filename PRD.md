@@ -39,7 +39,8 @@ Provide a polished end-to-end flow for public repository security checks:
 - `POST /api/certificate` `{ scanId } -> { certId }`
 - `GET /api/verify/:certId` `-> { status, certificate, scanSummary }`
 - `POST /api/fix-request` `{ scanId, contact, urgency, notes } -> { requestId }`
-- `POST /api/checkout/session` `{ mode, email, ... } -> { url, sessionId }`
+- `GET /api/products` `-> { oneTime: Product[], subscription: Product[] }`
+- `POST /api/checkout/session` `{ mode, email, items|slug, ... } -> { url, sessionId }`
 - `GET /api/checkout/session/verify` `?session_id -> { type, status, amount, items }`
 - `POST /api/webhooks/stripe` Stripe webhook (signature verified)
 - `GET /api/orders` `?email -> { orders[] }`
@@ -66,14 +67,10 @@ Provide a polished end-to-end flow for public repository security checks:
   - oversized repository
 
 ## Checkout & Pricing (Current UX)
-- Membership plans:
-  - Plus `$19/month`
-  - Pro `$49/month`
-- One-time gift passes:
-  - Cocurity Fix Pass `$149`
-  - Certification Pass `$39`
-  - bundle discount `$19` when both selected
-- Payment processed via Stripe Checkout Session (real charges).
+- Product catalog is DB-driven via Prisma `Product` records.
+- Baseline products are seeded via `npx prisma db seed`.
+- Membership plans and gift passes are rendered from `GET /api/products`.
+- Payment is processed via Stripe Checkout Session using dynamic `price_data`.
 
 ## Non-goals
 - Private repo OAuth integration
