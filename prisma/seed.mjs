@@ -1,8 +1,83 @@
-import { PrismaClient, Confidence, Grade, Severity, Verdict } from "@prisma/client";
+import {
+  PrismaClient,
+  Confidence,
+  Grade,
+  ProductType,
+  Severity,
+  Verdict,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const products = [
+    {
+      slug: "fix-pass",
+      name: "Cocurity Fix Pass",
+      description:
+        "One-time specialist remediation: Cocurity directly fixes detected security issues.",
+      price: 14900,
+      type: ProductType.ONE_TIME,
+      interval: null,
+      features: "[]",
+      benefit:
+        "Includes direct patch work for identified vulnerabilities in the selected scope.",
+      sortOrder: 0,
+    },
+    {
+      slug: "cert-pass",
+      name: "Certification Pass",
+      description: "One-time certification entitlement after fix + Cocurity re-scan.",
+      price: 3900,
+      type: ProductType.ONE_TIME,
+      interval: null,
+      features: "[]",
+      benefit:
+        "Enables certificate issuance if the post-fix scan meets certification criteria.",
+      sortOrder: 1,
+    },
+    {
+      slug: "plus",
+      name: "Plus",
+      description: "For growing teams that need larger scan capacity.",
+      price: 1900,
+      type: ProductType.SUBSCRIPTION,
+      interval: "month",
+      features: JSON.stringify([
+        "300 scans/month",
+        "2,000 files/scan",
+        "20MB text/scan",
+        "Priority processing",
+      ]),
+      benefit: null,
+      sortOrder: 0,
+    },
+    {
+      slug: "pro",
+      name: "Pro",
+      description: "For security-focused teams running high-volume checks.",
+      price: 4900,
+      type: ProductType.SUBSCRIPTION,
+      interval: "month",
+      features: JSON.stringify([
+        "2,000 scans/month",
+        "10,000 files/scan",
+        "100MB text/scan",
+        "Priority support",
+      ]),
+      benefit: null,
+      sortOrder: 1,
+    },
+  ];
+
+  for (const product of products) {
+    await prisma.product.upsert({
+      where: { slug: product.slug },
+      update: product,
+      create: product,
+    });
+  }
+
   const project = await prisma.project.upsert({
     where: { id: "demo_project" },
     update: {},

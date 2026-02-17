@@ -204,6 +204,11 @@ enum OrderType {
   SUBSCRIPTION
 }
 
+enum ProductType {
+  ONE_TIME
+  SUBSCRIPTION
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -234,4 +239,21 @@ model Order {
   @@index([stripeSessionId])
   @@index([email])
   @@index([scanRunId])
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String
+  description String?
+  price       Int // in cents (e.g. 14900 = $149)
+  currency    String      @default("usd")
+  type        ProductType
+  interval    String? // "month" for subscriptions, null for one-time
+  features    String      @default("[]") // JSON array of feature strings
+  benefit     String?
+  active      Boolean     @default(true)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
