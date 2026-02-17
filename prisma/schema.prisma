@@ -146,6 +146,7 @@ model ScanRun {
   findings    Finding[]
   certificates Certificate[]
   fixRequests FixRequest[]
+  orders      Order[]
 
   @@index([repoUrl])
   @@index([commitHash])
@@ -196,4 +197,41 @@ model FixRequest {
 
   @@index([scanRunId])
   @@index([userId])
+}
+
+enum OrderType {
+  ONE_TIME
+  SUBSCRIPTION
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  type              OrderType
+  status            OrderStatus @default(PENDING)
+  amount            Int         // in cents
+  currency          String      @default("usd")
+  email             String
+  scanRunId         String?
+  repoUrl           String?
+  items             String      @default("[]") // JSON array: ["Fix Pass","Cert Pass"]
+  stripeSessionId   String?     @unique
+  stripePaymentId   String?
+  stripeCustomerId  String?
+  stripeSubId       String?
+  paidAt            DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  scanRun           ScanRun?    @relation(fields: [scanRunId], references: [id])
+
+  @@index([stripeSessionId])
+  @@index([email])
+  @@index([scanRunId])
 }
