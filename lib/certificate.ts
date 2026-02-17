@@ -114,10 +114,14 @@ export async function renderCertificateImage(input: CertificateRenderInput) {
   const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
 
   try {
+    const fontsDir = join(process.cwd(), "assets", "fonts");
     const resvg = new Resvg(svg, {
       fitTo: { mode: "width", value: 1200 },
       font: {
-        fontBuffers: [fonts.regular, fonts.bold],
+        fontFiles: [
+          join(fontsDir, "Inter-Regular.woff2"),
+          join(fontsDir, "Inter-Bold.woff2"),
+        ],
         defaultFontFamily: "Inter",
       },
     });
