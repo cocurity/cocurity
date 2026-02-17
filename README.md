@@ -77,10 +77,20 @@ Backend:
 ## Tech Stack
 - Next.js App Router + TypeScript
 - TailwindCSS
-- Prisma + SQLite
+- Prisma + PostgreSQL (Vercel Postgres)
+- Vercel Blob (certificate image storage)
 - Next Route Handlers (`app/api/*`)
 
 ## Run Locally
 1. `npm install`
-2. `npx prisma migrate dev`
-3. `npm run dev`
+2. `cp .env.example .env`
+3. `npm run dev:up`
+
+### Dev Scripts
+| Command | Description |
+|---------|-------------|
+| `npm run dev:up` | Start DB (Docker) → migrate → dev server |
+| `npm run dev:reset` | Full DB reset with seed data |
+| `npm run dev:down` | Stop DB container |
+
+> Requires Docker. PostgreSQL runs via `docker-compose.yml`.

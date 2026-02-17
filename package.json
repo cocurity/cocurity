@@ -4,9 +4,13 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev",
+    "dev:up": "docker compose up -d --wait && npx prisma migrate deploy && next dev",
+    "dev:reset": "docker compose up -d --wait && npx prisma migrate reset --force",
+    "dev:down": "docker compose down",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:seed": "node prisma/seed.mjs"
@@ -15,6 +19,7 @@
     "@prisma/client": "^6.3.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
+    "@vercel/blob": "^2.2.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.0",
     "next": "^15.2.0",
@@ -25,6 +30,9 @@
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.4.1",
     "three": "^0.182.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
