@@ -21,10 +21,3 @@ export function getStripeServer(): Stripe {
 
   return instance;
 }
-
-export const STRIPE_PRICES = {
-  FIX_PASS: process.env.STRIPE_PRICE_FIX_PASS ?? "",
-  CERT_PASS: process.env.STRIPE_PRICE_CERT_PASS ?? "",
-  PLUS_MONTHLY: process.env.STRIPE_PRICE_PLUS_MONTHLY ?? "",
-  PRO_MONTHLY: process.env.STRIPE_PRICE_PRO_MONTHLY ?? "",
-} as const;
