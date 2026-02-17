@@ -2,19 +2,24 @@ import { randomBytes } from "node:crypto";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { put } from "@vercel/blob";
+import { Resvg } from "@resvg/resvg-js";
 import QRCode from "qrcode";
-import sharp from "sharp";
 
-let fontCache: { regular: string; bold: string } | null = null;
+let fontCache: { regular: Buffer; bold: Buffer; regularB64: string; boldB64: string } | null = null;
 
-async function loadFontsBase64() {
+async function loadFonts() {
   if (fontCache) return fontCache;
   const fontsDir = join(process.cwd(), "assets", "fonts");
   const [regular, bold] = await Promise.all([
-    readFile(join(fontsDir, "Inter-Regular.woff2")).then((b) => b.toString("base64")),
-    readFile(join(fontsDir, "Inter-Bold.woff2")).then((b) => b.toString("base64")),
+    readFile(join(fontsDir, "Inter-Regular.woff2")),
+    readFile(join(fontsDir, "Inter-Bold.woff2")),
   ]);
-  fontCache = { regular, bold };
+  fontCache = {
+    regular,
+    bold,
+    regularB64: regular.toString("base64"),
+    boldB64: bold.toString("base64"),
+  };
   return fontCache;
 }
 
@@ -56,15 +61,12 @@ function escapeHtml(text: string) {
     .replaceAll("'", "&#39;");
 }
 
-async function buildCertificateSvg(input: CertificateRenderInput) {
-  const [qrDataUrl, fonts] = await Promise.all([
-    QRCode.toDataURL(input.verifyUrl, {
-      errorCorrectionLevel: "M",
-      margin: 1,
-      width: 180,
-    }),
-    loadFontsBase64(),
-  ]);
+async function buildCertificateSvg(input: CertificateRenderInput, fonts: Awaited<ReturnType<typeof loadFonts>>) {
+  const qrDataUrl = await QRCode.toDataURL(input.verifyUrl, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    width: 180,
+  });
 
   const commit7 = input.commitHash.slice(0, 7);
   const issued = input.issuedAt.toISOString();
@@ -76,12 +78,12 @@ async function buildCertificateSvg(input: CertificateRenderInput) {
       @font-face {
         font-family: 'Inter';
         font-weight: 400;
-        src: url('data:font/woff2;base64,${fonts.regular}') format('woff2');
+        src: url('data:font/woff2;base64,${fonts.regularB64}') format('woff2');
       }
       @font-face {
         font-family: 'Inter';
         font-weight: 700;
-        src: url('data:font/woff2;base64,${fonts.bold}') format('woff2');
+        src: url('data:font/woff2;base64,${fonts.boldB64}') format('woff2');
       }
     </style>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -106,17 +108,20 @@ async function buildCertificateSvg(input: CertificateRenderInput) {
 </svg>`;
 }
 
-/**
- * Render certificate image.
- * - Production (Vercel): uploads to Vercel Blob and returns a public URL.
- * - Local dev: writes to public/certs/ as before.
- */
 export async function renderCertificateImage(input: CertificateRenderInput) {
-  const svg = await buildCertificateSvg(input);
+  const fonts = await loadFonts();
+  const svg = await buildCertificateSvg(input, fonts);
   const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
 
   try {
-    const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+    const resvg = new Resvg(svg, {
+      fitTo: { mode: "width", value: 1200 },
+      font: {
+        fontBuffers: [fonts.regular, fonts.bold],
+        defaultFontFamily: "Inter",
+      },
+    });
+    const pngBuffer = Buffer.from(resvg.render().asPng());
 
     if (useBlob) {
       const blob = await put(`certs/${input.certId}.png`, pngBuffer, {
