@@ -164,12 +164,13 @@ export default function VerifyDetailClient({ certId }: { certId: string }) {
 
   async function onDownload() {
     try {
-      const res = await fetch(data.certificate!.pngPath);
+      if (!data?.certificate) return;
+      const res = await fetch(data.certificate.pngPath);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${data.certificate!.certId}.png`;
+      anchor.download = `${data.certificate.certId}.png`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { put } from "@vercel/blob";
 import QRCode from "qrcode";
 import sharp from "sharp";
 
@@ -77,21 +78,44 @@ async function buildCertificateSvg(input: CertificateRenderInput) {
 </svg>`;
 }
 
+/**
+ * Render certificate image.
+ * - Production (Vercel): uploads to Vercel Blob and returns a public URL.
+ * - Local dev: writes to public/certs/ as before.
+ */
 export async function renderCertificateImage(input: CertificateRenderInput) {
-  const certDir = join(process.cwd(), "public", "certs");
-  await mkdir(certDir, { recursive: true });
-  const pngPath = join(certDir, `${input.certId}.png`);
-  const svgPath = join(certDir, `${input.certId}.svg`);
-
   const svg = await buildCertificateSvg(input);
+  const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
 
   try {
     const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
-    await writeFile(pngPath, pngBuffer);
+
+    if (useBlob) {
+      const blob = await put(`certs/${input.certId}.png`, pngBuffer, {
+        access: "public",
+        contentType: "image/png",
+      });
+      return { imagePath: blob.url, format: "png" as const };
+    }
+
+    const certDir = join(process.cwd(), "public", "certs");
+    await mkdir(certDir, { recursive: true });
+    await writeFile(join(certDir, `${input.certId}.png`), pngBuffer);
     return { imagePath: `/certs/${input.certId}.png`, format: "png" as const };
   } catch (error) {
-    console.warn("TODO: PNG rendering failed, falling back to SVG certificate output.", error);
-    await writeFile(svgPath, svg);
+    console.warn("PNG rendering failed, falling back to SVG certificate output.", error);
+
+    if (useBlob) {
+      const blob = await put(`certs/${input.certId}.svg`, svg, {
+        access: "public",
+        contentType: "image/svg+xml",
+      });
+      return { imagePath: blob.url, format: "svg" as const };
+    }
+
+    const certDir = join(process.cwd(), "public", "certs");
+    await mkdir(certDir, { recursive: true });
+    await writeFile(join(certDir, `${input.certId}.svg`), svg);
     return { imagePath: `/certs/${input.certId}.svg`, format: "svg" as const };
   }
 }
