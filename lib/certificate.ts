@@ -1,20 +1,25 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { put } from "@vercel/blob";
-import { Resvg, type ResvgRenderOptions } from "@resvg/resvg-js";
+import { Resvg } from "@resvg/resvg-js";
 import QRCode from "qrcode";
 import { INTER_REGULAR, INTER_BOLD } from "./fonts";
 
-type FontOptions = NonNullable<ResvgRenderOptions["font"]> & { fontBuffers?: Buffer[] };
+let fontPaths: { regular: string; bold: string } | null = null;
 
-const fontData = {
-  regular: INTER_REGULAR,
-  bold: INTER_BOLD,
-};
-
-function loadFonts() {
-  return fontData;
+async function ensureFontFiles() {
+  if (fontPaths) return fontPaths;
+  const dir = join(tmpdir(), "cocurity-fonts");
+  await mkdir(dir, { recursive: true });
+  const regularPath = join(dir, "Inter-Regular.ttf");
+  const boldPath = join(dir, "Inter-Bold.ttf");
+  if (!existsSync(regularPath)) await writeFile(regularPath, INTER_REGULAR);
+  if (!existsSync(boldPath)) await writeFile(boldPath, INTER_BOLD);
+  fontPaths = { regular: regularPath, bold: boldPath };
+  return fontPaths;
 }
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -91,19 +96,18 @@ async function buildCertificateSvg(input: CertificateRenderInput) {
 }
 
 export async function renderCertificateImage(input: CertificateRenderInput) {
-  const fonts = await loadFonts();
+  const fonts = await ensureFontFiles();
   const svg = await buildCertificateSvg(input);
   const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
 
   try {
-    const font: FontOptions = {
-      fontBuffers: [fonts.regular, fonts.bold],
-      loadSystemFonts: false,
-      defaultFontFamily: "Inter",
-    };
     const resvg = new Resvg(svg, {
       fitTo: { mode: "width", value: 1200 },
-      font,
+      font: {
+        fontFiles: [fonts.regular, fonts.bold],
+        loadSystemFonts: false,
+        defaultFontFamily: "Inter",
+      },
     });
     const pngBuffer = Buffer.from(resvg.render().asPng());
 
