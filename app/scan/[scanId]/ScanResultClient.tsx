@@ -69,7 +69,7 @@ export default function ScanResultClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
@@ -105,8 +105,9 @@ export default function ScanResultClient({
 
   useEffect(() => {
     if (initialData.scan.aiEnabled) return;
+    if (sessionStatus === "loading") return;
 
-    if (!session?.user) {
+    if (sessionStatus === "unauthenticated") {
       const timer = window.setTimeout(() => setShowUpgradeModal(true), 2500);
       return () => window.clearTimeout(timer);
     }
@@ -122,10 +123,11 @@ export default function ScanResultClient({
           const timer = window.setTimeout(() => setShowUpgradeModal(true), 2000);
           return () => window.clearTimeout(timer);
         }
+        setShowUpgradeModal(false);
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [session, initialData.scan.aiEnabled]);
+  }, [sessionStatus, initialData.scan.aiEnabled]);
 
   useEffect(() => {
     if (!giftPurchased) return;
