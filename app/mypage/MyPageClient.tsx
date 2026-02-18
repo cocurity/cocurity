@@ -10,8 +10,14 @@ import {
 } from "@/lib/client/fix-orders";
 import { getScanHistory } from "@/lib/client/scan-history";
 
+interface SubscriptionInfo {
+  plan: string;
+  currentPeriodEnd: string | null;
+}
+
 interface Props {
   user: { name?: string | null; email?: string | null; image?: string | null };
+  subscription: SubscriptionInfo | null;
 }
 
 function formatDate(value: string) {
@@ -28,7 +34,19 @@ function statusLabel(status: string) {
   return status;
 }
 
-export default function MyPageClient({ user }: Props) {
+function planLabel(plan: string) {
+  if (plan === "PLUS") return "Plus";
+  if (plan === "PRO") return "Pro";
+  return "Free";
+}
+
+function planBadgeColor(plan: string) {
+  if (plan === "PRO") return "text-amber-100 bg-amber-400/20 border-amber-200/30";
+  if (plan === "PLUS") return "text-cyan-100 bg-cyan-400/20 border-cyan-200/30";
+  return "text-slate-300 bg-white/5 border-white/15";
+}
+
+export default function MyPageClient({ user, subscription }: Props) {
   const [fixOrders, setFixOrders] = useState<CocurityFixOrder[]>([]);
 
   useEffect(() => {
@@ -78,6 +96,27 @@ export default function MyPageClient({ user }: Props) {
             <p className="text-sm font-medium text-slate-100">{user.name}</p>
             <p className="text-xs text-slate-400">{user.email}</p>
           </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <span
+            className={[
+              "inline-flex rounded-lg border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em]",
+              planBadgeColor(subscription?.plan ?? "FREE"),
+            ].join(" ")}
+          >
+            {planLabel(subscription?.plan ?? "FREE")}
+          </span>
+          {subscription?.currentPeriodEnd && (
+            <span className="text-xs text-slate-400">
+              expires {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+            </span>
+          )}
+          {(!subscription || subscription.plan === "FREE") && (
+            <Link href="/pricing" className="text-xs text-cyan-200 hover:underline">
+              Upgrade
+            </Link>
+          )}
         </div>
       </section>
 
