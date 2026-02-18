@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserPlan } from "@/lib/subscription";
 import { buildCertId, renderCertificateImage } from "@/lib/certificate";
 
 type CertificateRequestBody = { scanId?: string };
@@ -8,6 +10,19 @@ export async function POST(request: Request) {
   if (process.env.FF_CERT_ENABLED !== "1") {
     return NextResponse.json(
       { error: "Certificate issuance is disabled by feature flag." },
+      { status: 403 }
+    );
+  }
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  const plan = await getUserPlan(session.user.id);
+  if (plan === "FREE") {
+    return NextResponse.json(
+      { error: "Certificate issuance requires a Plus or Pro membership." },
       { status: 403 }
     );
   }

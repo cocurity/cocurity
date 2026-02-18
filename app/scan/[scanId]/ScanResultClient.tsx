@@ -93,7 +93,7 @@ export default function ScanResultClient({
 
   const categories = useMemo(() => topRiskCategories(initialData.findings), [initialData.findings]);
   const tone = getVerdictTone(initialData.scan);
-  const canIssueCertificate = ffCert && initialData.scan.criticalCount === 0;
+  const canIssueCertificate = ffCert && initialData.scan.criticalCount === 0 && isPaidPlan;
   const isNoFindingsAudit = mode === "audit" && initialData.findings.length === 0;
   const isNoCategoryDependency = mode === "dependency" && categories.length === 0;
   const reportId = initialData.scan.id;
@@ -357,14 +357,24 @@ export default function ScanResultClient({
                 <button type="button" className="lp-button lp-button-ghost" onClick={() => router.push("/scan")}>
                   Back
                 </button>
-                <button
-                  type="button"
-                  className="lp-button lp-button-primary"
-                  onClick={onIssueCertificate}
-                  disabled={isIssuing || !canIssueCertificate}
-                >
-                  {isIssuing ? "Issuing..." : "Get Certification"}
-                </button>
+                {isPaidPlan ? (
+                  <button
+                    type="button"
+                    className="lp-button lp-button-primary"
+                    onClick={onIssueCertificate}
+                    disabled={isIssuing || !canIssueCertificate}
+                  >
+                    {isIssuing ? "Issuing..." : "Get Certification"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="lp-button lp-button-primary"
+                    onClick={() => router.push(`/pricing?plan=plus&returnTo=${encodeURIComponent(`/scan/${initialData.scan.id}?mode=${mode}`)}`)}
+                  >
+                    Upgrade to certify
+                  </button>
+                )}
               </>
             ) : (
               <>
