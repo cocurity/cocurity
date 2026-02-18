@@ -121,11 +121,6 @@ export default function ScanResultClient({
   }
 
   async function onIssueCertificate() {
-    if (!session?.user) {
-      const current = `/scan/${initialData.scan.id}?mode=${mode}`;
-      router.push(`/login?callbackUrl=${encodeURIComponent(current)}`);
-      return;
-    }
     setActionMessage(null);
     setIsIssuing(true);
     try {
