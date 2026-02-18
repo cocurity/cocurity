@@ -78,8 +78,16 @@ export default function ScanResultClient({
   const [giftFixPass, setGiftFixPass] = useState(true);
   const [giftCertPass, setGiftCertPass] = useState(true);
   const [showPaymentDoneModal, setShowPaymentDoneModal] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeTimerFired, setUpgradeTimerFired] = useState(false);
+  const [upgradeDismissed, setUpgradeDismissed] = useState(false);
   const [userPlan, setUserPlan] = useState<string | null>(null);
+
+  const isPaidPlan = userPlan === "PLUS" || userPlan === "PRO";
+  const showUpgradeModal =
+    upgradeTimerFired &&
+    !upgradeDismissed &&
+    !isPaidPlan &&
+    !initialData.scan.aiEnabled;
 
   const ffCert = process.env.NEXT_PUBLIC_FF_CERT_ENABLED === "1";
 
@@ -108,11 +116,12 @@ export default function ScanResultClient({
     if (sessionStatus === "loading") return;
 
     if (sessionStatus === "unauthenticated") {
-      const timer = window.setTimeout(() => setShowUpgradeModal(true), 2500);
+      const timer = window.setTimeout(() => setUpgradeTimerFired(true), 2500);
       return () => window.clearTimeout(timer);
     }
 
     let cancelled = false;
+    let delayTimer: number | null = null;
     fetch("/api/subscription")
       .then((res) => res.json())
       .then((data: { plan?: string }) => {
@@ -120,13 +129,14 @@ export default function ScanResultClient({
         const plan = data.plan ?? "FREE";
         setUserPlan(plan);
         if (plan === "FREE") {
-          const timer = window.setTimeout(() => setShowUpgradeModal(true), 2000);
-          return () => window.clearTimeout(timer);
+          delayTimer = window.setTimeout(() => setUpgradeTimerFired(true), 2000);
         }
-        setShowUpgradeModal(false);
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (delayTimer) clearTimeout(delayTimer);
+    };
   }, [sessionStatus, initialData.scan.aiEnabled]);
 
   useEffect(() => {
@@ -537,7 +547,7 @@ export default function ScanResultClient({
                 <button
                   type="button"
                   className="text-slate-400 hover:text-slate-200"
-                  onClick={() => setShowUpgradeModal(false)}
+                  onClick={() => setUpgradeDismissed(true)}
                 >
                   <span className="sr-only">Close</span>
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -577,7 +587,7 @@ export default function ScanResultClient({
                 >
                   Upgrade now
                 </Link>
-                <button type="button" className="lp-button lp-button-ghost" onClick={() => setShowUpgradeModal(false)}>
+                <button type="button" className="lp-button lp-button-ghost" onClick={() => setUpgradeDismissed(true)}>
                   Maybe later
                 </button>
               </div>
