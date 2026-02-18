@@ -11,8 +11,6 @@ type FontOptions = NonNullable<ResvgRenderOptions["font"]> & { fontBuffers?: Buf
 const fontData = {
   regular: INTER_REGULAR,
   bold: INTER_BOLD,
-  regularB64: INTER_REGULAR.toString("base64"),
-  boldB64: INTER_BOLD.toString("base64"),
 };
 
 function loadFonts() {
@@ -57,7 +55,7 @@ function escapeHtml(text: string) {
     .replaceAll("'", "&#39;");
 }
 
-async function buildCertificateSvg(input: CertificateRenderInput, fonts: Awaited<ReturnType<typeof loadFonts>>) {
+async function buildCertificateSvg(input: CertificateRenderInput) {
   const qrDataUrl = await QRCode.toDataURL(input.verifyUrl, {
     errorCorrectionLevel: "M",
     margin: 1,
@@ -70,18 +68,6 @@ async function buildCertificateSvg(input: CertificateRenderInput, fonts: Awaited
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
   <defs>
-    <style>
-      @font-face {
-        font-family: 'Inter';
-        font-weight: 400;
-        src: url('data:font/woff2;base64,${fonts.regularB64}') format('woff2');
-      }
-      @font-face {
-        font-family: 'Inter';
-        font-weight: 700;
-        src: url('data:font/woff2;base64,${fonts.boldB64}') format('woff2');
-      }
-    </style>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#f8fafc"/>
       <stop offset="100%" stop-color="#e2e8f0"/>
@@ -106,7 +92,7 @@ async function buildCertificateSvg(input: CertificateRenderInput, fonts: Awaited
 
 export async function renderCertificateImage(input: CertificateRenderInput) {
   const fonts = await loadFonts();
-  const svg = await buildCertificateSvg(input, fonts);
+  const svg = await buildCertificateSvg(input);
   const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
 
   try {
