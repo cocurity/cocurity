@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
+import AuthProvider from "@/components/auth/AuthProvider";
 import TopNav from "@/components/layout/TopNav";
 import "./globals.css";
 
@@ -29,16 +30,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${jakarta.variable} ${spaceGrotesk.variable}`}>
-        <header className="lp-topbar">
-          <div className="lp-topbar-inner">
-            <Link href="/" className="lp-brand">
-              <span className="lp-brand-dot" />
-              Cocurity
-            </Link>
-            <TopNav />
-          </div>
-        </header>
-        <div className="lp-shell">{children}</div>
+        <AuthProvider>
+          <header className="lp-topbar">
+            <div className="lp-topbar-inner">
+              <Link href="/" className="lp-brand">
+                <span className="lp-brand-dot" />
+                Cocurity
+              </Link>
+              <TopNav />
+            </div>
+          </header>
+          <div className="lp-shell">{children}</div>
+        </AuthProvider>
       </body>
     </html>
   );
