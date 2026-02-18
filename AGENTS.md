@@ -21,6 +21,7 @@ Read this file first. These rules are the project source of truth for coding age
   - Render findings and issue reports
   - Certificate issuance/verification
   - Notify maintainer + gift checkout flow
+  - Gift link claim flow
   - My page for Cocurity Fix tracking and reports
 
 ## 4) Current Routes
@@ -31,6 +32,7 @@ Read this file first. These rules are the project source of truth for coding age
 - `/verify`
 - `/verify/[certId]`
 - `/pricing`
+- `/gift/[code]`
 - `/mypage`
 - `/changelog`
 - `/ui`

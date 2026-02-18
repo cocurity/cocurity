@@ -6,7 +6,7 @@ type Props = {
   searchParams: Promise<{ callbackUrl?: string }>;
 };
 
-const ALLOWED_PATHS = ["/mypage", "/pricing", "/scan"];
+const ALLOWED_PATHS = ["/mypage", "/pricing", "/scan", "/gift"];
 
 function resolveRedirectTo(callbackUrl?: string): string {
   if (!callbackUrl) return "/mypage";

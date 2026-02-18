@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasClaimedCertGiftForScan } from "@/lib/gift";
 import { getUserPlan } from "@/lib/subscription";
 import { buildCertId, renderCertificateImage } from "@/lib/certificate";
 
@@ -19,14 +20,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
-  const plan = await getUserPlan(session.user.id);
-  if (plan === "FREE") {
-    return NextResponse.json(
-      { error: "Certificate issuance requires a Plus or Pro membership." },
-      { status: 403 }
-    );
-  }
-
   let body: CertificateRequestBody;
   try {
     body = (await request.json()) as CertificateRequestBody;
@@ -37,6 +30,15 @@ export async function POST(request: Request) {
   const scanId = body.scanId?.trim();
   if (!scanId) {
     return NextResponse.json({ error: "scanId is required." }, { status: 400 });
+  }
+
+  const plan = await getUserPlan(session.user.id);
+  const canUseGiftCert = await hasClaimedCertGiftForScan(session.user.id, scanId);
+  if (plan === "FREE" && !canUseGiftCert) {
+    return NextResponse.json(
+      { error: "Certificate issuance requires Plus/Pro membership or a claimed Certification Pass." },
+      { status: 403 }
+    );
   }
 
   const scanRun = await prisma.scanRun.findUnique({

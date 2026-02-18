@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
+import { hasClaimedCertGiftForScan } from "@/lib/gift";
 import { prisma } from "@/lib/prisma";
 import ScanResultClient from "./ScanResultClient";
 
@@ -10,6 +12,7 @@ type Props = {
 export default async function ScanResultPage({ params, searchParams }: Props) {
   const { scanId } = await params;
   const search = await searchParams;
+  const session = await auth();
   const mode = search.mode === "dependency" ? "dependency" : "audit";
 
   const scan = await prisma.scanRun.findUnique({
@@ -27,6 +30,10 @@ export default async function ScanResultPage({ params, searchParams }: Props) {
     confidence: finding.confidence.toLowerCase() as "high" | "medium" | "low",
   }));
 
+  const giftCertClaimed = session?.user?.id
+    ? await hasClaimedCertGiftForScan(session.user.id, scan.id)
+    : false;
+
   return (
     <ScanResultClient
       mode={mode}
@@ -41,6 +48,7 @@ export default async function ScanResultPage({ params, searchParams }: Props) {
           warningCount: scan.warningCount,
           commitHash: scan.commitHash,
           createdAt: scan.createdAt.toISOString(),
+          giftCertClaimed,
         },
         findings: normalizedFindings,
       }}

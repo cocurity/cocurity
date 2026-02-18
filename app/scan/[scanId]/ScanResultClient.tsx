@@ -31,6 +31,7 @@ type ScanPayload = {
     commitHash: string;
     createdAt: string;
     aiEnabled?: boolean;
+    giftCertClaimed?: boolean;
   };
   findings: Finding[];
 };
@@ -93,7 +94,10 @@ export default function ScanResultClient({
 
   const categories = useMemo(() => topRiskCategories(initialData.findings), [initialData.findings]);
   const tone = getVerdictTone(initialData.scan);
-  const canIssueCertificate = ffCert && initialData.scan.criticalCount === 0 && isPaidPlan;
+  const canIssueCertificate =
+    ffCert &&
+    initialData.scan.criticalCount === 0 &&
+    (isPaidPlan || Boolean(initialData.scan.giftCertClaimed));
   const isNoFindingsAudit = mode === "audit" && initialData.findings.length === 0;
   const isNoCategoryDependency = mode === "dependency" && categories.length === 0;
   const reportId = initialData.scan.id;
@@ -101,12 +105,16 @@ export default function ScanResultClient({
   const repoOwner = repoSegments[repoSegments.length - 2] || "";
   const repoName = repoSegments[repoSegments.length - 1] || "repository";
   const giftPurchased = searchParams.get("gift_paid") === "1";
+  const giftCode = searchParams.get("gift_code");
+  const giftRedeemUrl = giftCode ? `https://cocurity.com/gift/${giftCode}` : null;
   const paymentDone = searchParams.get("payment_done") === "1";
   const notifyTemplate = giftPurchased
     ? [
         `Hi maintainer of ${repoName}, Cocurity found potential security issues.`,
         `View report: https://cocurity.com/r/${reportId}`,
-        "🎁 Gift from cocurity — Gift code: COCU-FREE-DIAG (free full diagnostic + certificate)",
+        giftRedeemUrl
+          ? `🎁 Gift from Cocurity — Claim your gift pass: ${giftRedeemUrl}`
+          : "🎁 Gift from Cocurity — claim link will be shared separately.",
       ].join("\n")
     : [
         `Hi maintainer of ${repoName}, Cocurity found potential security issues.`,
@@ -378,7 +386,7 @@ export default function ScanResultClient({
                 <button type="button" className="lp-button lp-button-ghost" onClick={() => router.push("/scan")}>
                   Back
                 </button>
-                {isPaidPlan ? (
+                {canIssueCertificate ? (
                   <button
                     type="button"
                     className="lp-button lp-button-primary"

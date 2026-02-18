@@ -104,6 +104,35 @@ function PricingContent() {
     try {
       await new Promise((resolve) => setTimeout(resolve, 1200));
 
+      let issuedGiftCode: string | null = null;
+
+      if (isGiftCheckout) {
+        if (!scanId) {
+          setMessage("Gift checkout requires a valid scan id.");
+          return;
+        }
+
+        const giftRes = await fetch("/api/gift", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scanId,
+            recipientEmail: email,
+            includesFix: giftFix,
+            includesCert: giftCert,
+          }),
+        });
+
+        if (!giftRes.ok) {
+          const data = (await giftRes.json()) as { error?: string };
+          setMessage(data.error ?? "Gift code issuance failed.");
+          return;
+        }
+
+        const data = (await giftRes.json()) as { giftCode?: string };
+        issuedGiftCode = data.giftCode ?? null;
+      }
+
       if (isGiftCheckout && giftFix) {
         addFixOrder({
           id: `fix_${Date.now()}`,
@@ -133,7 +162,8 @@ function PricingContent() {
 
       if (returnTo) {
         const separator = returnTo.includes("?") ? "&" : "?";
-        router.push(`${returnTo}${separator}payment_done=1`);
+        const giftCodeQuery = isGiftCheckout && issuedGiftCode ? `&gift_code=${encodeURIComponent(issuedGiftCode)}` : "";
+        router.push(`${returnTo}${separator}payment_done=1${giftCodeQuery}`);
         return;
       }
       setMessage("Payment completed successfully.");

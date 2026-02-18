@@ -58,6 +58,8 @@ model User {
   accounts      Account[]
   sessions      Session[]
   subscription  Subscription?
+  giftCodesSent GiftCode[] @relation("GiftCodeSender")
+  giftCodesClaimed GiftCode[] @relation("GiftCodeClaimedBy")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -146,10 +148,31 @@ model ScanRun {
   findings    Finding[]
   certificates Certificate[]
   fixRequests FixRequest[]
+  giftCodes   GiftCode[]
 
   @@index([repoUrl])
   @@index([commitHash])
   @@index([repoUrl, commitHash, scanConfigVersion])
+}
+
+model GiftCode {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  scanRunId       String
+  senderUserId    String
+  recipientEmail  String?
+  includesFix     Boolean   @default(false)
+  includesCert    Boolean   @default(false)
+  claimedByUserId String?
+  claimedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  scanRun         ScanRun   @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+  sender          User      @relation("GiftCodeSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+  claimedBy       User?     @relation("GiftCodeClaimedBy", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([scanRunId])
+  @@index([senderUserId])
+  @@index([claimedByUserId])
 }
 
 model Finding {

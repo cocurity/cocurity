@@ -13,7 +13,8 @@ Provide a polished end-to-end flow for public repository security checks:
 3. User opens issue report `/r/[reportId]`.
 4. User verifies certificate via `/verify` and `/verify/[certId]`.
 5. User can start checkout from result actions (`Cocourity Fix`) and complete simulated payment at `/pricing`.
-6. User sees Cocurity Fix request statuses in `/mypage`.
+6. Gift recipient can claim pass via `/gift/[code]`.
+7. User sees Cocurity Fix request statuses in `/mypage`.
 
 ## Current Acceptance Criteria
 1. Scan can start with public GitHub URL and returns `scanId`.
@@ -22,9 +23,10 @@ Provide a polished end-to-end flow for public repository security checks:
    - `severity`, `location`, `riskSummary`, `hint`, `confidence`.
 4. Dependency mode supports maintainer notification modal.
 5. Gift checkout flow works:
-   - select one-time gift options
-   - complete simulated payment
-   - return to result page with completion feedback.
+    - select one-time gift options
+    - complete simulated payment
+    - return to result page with completion feedback
+    - generated gift link can be sent to maintainer and claimed.
 6. Certificate issuance works when critical findings are zero.
 7. Verify pages show trustworthy metadata + status (`valid`, `outdated`, `invalid`).
 8. My page provides:

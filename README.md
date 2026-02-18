@@ -16,6 +16,7 @@ Fullstack MVP for repository security scanning, certificate verification, and fi
 - Share flow for maintainers:
   - notify message
   - gift-pack checkout flow for remediation/certification
+  - redeemable gift link delivery and claim page
 - User workspace (`My page`):
   - local login toggle
   - Cocurity Fix request status tracking
@@ -29,6 +30,7 @@ Fullstack MVP for repository security scanning, certificate verification, and fi
 - `/verify` Certificate search
 - `/verify/[certId]` Certificate verification detail
 - `/pricing` Checkout UI (simulated payment UX)
+- `/gift/[code]` Gift pass claim page
 - `/mypage` User workspace (local-state based)
 - `/changelog` Changelog page
 - `/ui` UI showcase
@@ -40,6 +42,9 @@ Fullstack MVP for repository security scanning, certificate verification, and fi
 - `POST /api/certificate` `{ scanId } -> { certId }`
 - `GET /api/verify/:certId` `-> { status, certificate, scanSummary }`
 - `POST /api/fix-request` `{ scanId, contact, urgency, notes } -> { requestId }`
+
+Additional APIs:
+- `POST /api/gift` `{ scanId, recipientEmail?, includesFix, includesCert } -> { giftCode, redeemUrl, includesFix, includesCert }`
 
 ## Scoring Rules
 - Base score: `100`
