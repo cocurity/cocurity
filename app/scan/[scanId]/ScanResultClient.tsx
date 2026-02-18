@@ -186,7 +186,7 @@ export default function ScanResultClient({
 
   async function onSendMessage() {
     try {
-      const res = await fetch(`/api/github-user/${encodeURIComponent(repoOwner)}`);
+      const res = await fetch(`/api/github-user/${encodeURIComponent(repoOwner)}?repo=${encodeURIComponent(repoName)}`);
       const data = (await res.json()) as { email?: string | null; profileUrl?: string };
 
       if (data.email) {

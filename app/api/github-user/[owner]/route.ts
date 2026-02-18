@@ -22,10 +22,12 @@ function isUsableEmail(email: string | undefined | null): email is string {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ owner: string }> },
 ) {
   const { owner } = await params;
+  const { searchParams } = new URL(request.url);
+  const repo = searchParams.get("repo") ?? owner;
 
   if (!owner || owner.length > 100) {
     return NextResponse.json({ error: "Invalid owner." }, { status: 400 });
@@ -52,7 +54,7 @@ export async function GET(
 
   try {
     const commitsRes = await fetch(
-      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(owner)}/commits?author=${encodeURIComponent(owner)}&per_page=5`,
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?author=${encodeURIComponent(owner)}&per_page=5`,
       { headers, cache: "no-store" },
     );
 
