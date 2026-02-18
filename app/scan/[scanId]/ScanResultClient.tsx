@@ -153,12 +153,13 @@ export default function ScanResultClient({
     if (!giftPurchased) return;
     setShowNotifyModal(true);
     setShowGiftOptions(false);
+    setShowPaymentDoneModal(false);
   }, [giftPurchased]);
 
   useEffect(() => {
-    if (!paymentDone) return;
+    if (!paymentDone || giftPurchased) return;
     setShowPaymentDoneModal(true);
-  }, [paymentDone]);
+  }, [paymentDone, giftPurchased]);
 
   useEffect(() => {
     if (!actionMessage) return;
@@ -546,11 +547,11 @@ export default function ScanResultClient({
               exit={{ y: 12, opacity: 0 }}
               className="co-noise-card w-full max-w-md rounded-2xl p-6"
             >
-              <h3 className="text-lg font-semibold text-slate-100">결제완료!</h3>
-              <p className="mt-2 text-sm text-slate-300">결제 당시 입력한 이메일함을 확인해주세요</p>
+              <h3 className="text-lg font-semibold text-slate-100">Payment complete</h3>
+              <p className="mt-2 text-sm text-slate-300">Please check the email inbox you used at checkout.</p>
               <div className="mt-5">
                 <button type="button" className="lp-button lp-button-primary" onClick={() => setShowPaymentDoneModal(false)}>
-                  닫기
+                  Close
                 </button>
               </div>
             </motion.div>
