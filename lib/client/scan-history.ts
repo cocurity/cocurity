@@ -13,6 +13,21 @@ export type ScanHistoryItem = {
 const HISTORY_KEY = "launchpass_scan_history_v1";
 const HISTORY_LIMIT = 25;
 
+function byCreatedAtDesc(a: ScanHistoryItem, b: ScanHistoryItem) {
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+}
+
+function dedupeByScanId(items: ScanHistoryItem[]) {
+  const seen = new Set<string>();
+  const sorted = [...items].sort(byCreatedAtDesc);
+  return sorted.filter((item) => {
+    if (!item.scanId) return false;
+    if (seen.has(item.scanId)) return false;
+    seen.add(item.scanId);
+    return true;
+  });
+}
+
 function readHistory(): ScanHistoryItem[] {
   if (typeof window === "undefined") return [];
   try {
@@ -32,11 +47,22 @@ function writeHistory(items: ScanHistoryItem[]) {
 }
 
 export function getScanHistory() {
-  return readHistory();
+  const current = readHistory();
+  const deduped = dedupeByScanId(current);
+  if (deduped.length !== current.length) {
+    writeHistory(deduped);
+  }
+  return deduped;
 }
 
 export function upsertScanHistoryItem(item: ScanHistoryItem) {
   const current = readHistory();
-  const next = [item, ...current.filter((entry) => entry.scanId !== item.scanId)];
+  const next = dedupeByScanId([
+    {
+      ...item,
+      repoUrl: item.repoUrl.trim(),
+    },
+    ...current,
+  ]);
   writeHistory(next);
 }
