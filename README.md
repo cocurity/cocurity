@@ -28,8 +28,9 @@ Fullstack MVP for repository security scanning, certificate verification, and fi
 - `/r/[reportId]` Issue report detail
 - `/verify` Certificate search
 - `/verify/[certId]` Certificate verification detail
-- `/pricing` Checkout UI (simulated payment UX)
-- `/mypage` User workspace (local-state based)
+- `/pricing` Checkout UI (Stripe Checkout Session)
+- `/pricing/success` Post-checkout confirmation
+- `/mypage` User workspace (order tracking via API)
 - `/changelog` Changelog page
 - `/ui` UI showcase
 
@@ -40,6 +41,11 @@ Fullstack MVP for repository security scanning, certificate verification, and fi
 - `POST /api/certificate` `{ scanId } -> { certId }`
 - `GET /api/verify/:certId` `-> { status, certificate, scanSummary }`
 - `POST /api/fix-request` `{ scanId, contact, urgency, notes } -> { requestId }`
+- `GET /api/products` `-> { oneTime: Product[], subscription: Product[] }`
+- `POST /api/checkout/session` `{ mode, email, items|slug, ... } -> { url, sessionId }`
+- `GET /api/checkout/session/verify` `?session_id -> { type, status, amount, items }`
+- `POST /api/webhooks/stripe` Stripe webhook handler
+- `GET /api/orders` `?email -> { orders[] }`
 
 ## Scoring Rules
 - Base score: `100`
@@ -73,18 +79,28 @@ Backend:
 - `FF_CERT_ENABLED=0|1`
 - `FF_AI_SUMMARY_ENABLED=0|1` (optional)
 - `GITHUB_TOKEN` (optional, for higher API limits)
+- `STRIPE_SECRET_KEY` (Stripe server-side key)
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (Stripe client-side key)
+- `STRIPE_WEBHOOK_SECRET` (Stripe webhook signature verification)
+
+## Product Catalog Source
+- Products are managed in PostgreSQL via Prisma `Product` records.
+- Seed default products with `npx prisma db seed`.
+- Checkout session line items are built from DB products using Stripe `price_data`.
 
 ## Tech Stack
 - Next.js App Router + TypeScript
 - TailwindCSS
 - Prisma + PostgreSQL (Vercel Postgres)
 - Vercel Blob (certificate image storage)
+- Stripe (Checkout Session for payments)
 - Next Route Handlers (`app/api/*`)
 
 ## Run Locally
 1. `npm install`
-2. `cp .env.example .env`
+2. `cp .env.example .env` and fill in Stripe keys
 3. `npm run dev:up`
+4. For Stripe webhooks locally: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
 
 ### Dev Scripts
 | Command | Description |

@@ -1,0 +1,14 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function GET() {
+  const products = await prisma.product.findMany({
+    where: { active: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
+
+  return NextResponse.json({
+    oneTime: products.filter((product) => product.type === "ONE_TIME"),
+    subscription: products.filter((product) => product.type === "SUBSCRIPTION"),
+  });
+}
