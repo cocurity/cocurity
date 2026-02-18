@@ -42,6 +42,11 @@ enum Plan {
   PRO
 }
 
+enum FindingSource {
+  RULE
+  AI
+}
+
 // ─── Auth (NextAuth / Auth.js) ──────────────────────────────
 
 model User {
@@ -134,6 +139,7 @@ model ScanRun {
   verdict     Verdict
   criticalCount Int
   warningCount Int
+  aiEnabled   Boolean    @default(false)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -147,15 +153,16 @@ model ScanRun {
 }
 
 model Finding {
-  id          String     @id @default(cuid())
+  id          String        @id @default(cuid())
   scanRunId   String
   severity    Severity
   location    String
   riskSummary String
   hint        String
   confidence  Confidence
-  createdAt   DateTime   @default(now())
-  scanRun     ScanRun    @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+  source      FindingSource @default(RULE)
+  createdAt   DateTime      @default(now())
+  scanRun     ScanRun       @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
 
   @@index([scanRunId])
 }

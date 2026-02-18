@@ -286,6 +286,7 @@ export async function scanGitHubRepository(repoUrl: string) {
   }
 
   const findings: ScanFindingInput[] = [];
+  const fetchedFiles: { path: string; content: string }[] = [];
   const dedupe = new Set<string>();
   let fetchedBytes = 0;
 
@@ -324,6 +325,7 @@ export async function scanGitHubRepository(repoUrl: string) {
       );
     }
 
+    fetchedFiles.push({ path: location, content });
     const sanitized = maskSecretLikeStrings(content);
 
     for (const pattern of SECRET_PATTERNS) {
@@ -363,6 +365,7 @@ export async function scanGitHubRepository(repoUrl: string) {
     commitHash,
     scanConfigVersion: SCAN_CONFIG_VERSION,
     findings,
+    fetchedFiles,
   };
 }
 

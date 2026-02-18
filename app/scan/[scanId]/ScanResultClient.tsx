@@ -16,6 +16,7 @@ type Finding = {
   riskSummary: string;
   hint: string;
   confidence: "high" | "medium" | "low";
+  source?: "RULE" | "AI";
 };
 
 type ScanPayload = {
@@ -29,6 +30,7 @@ type ScanPayload = {
     warningCount: number;
     commitHash: string;
     createdAt: string;
+    aiEnabled?: boolean;
   };
   findings: Finding[];
 };
@@ -242,10 +244,29 @@ export default function ScanResultClient({
         </section>
       ) : (
         <section className="co-noise-card rounded-2xl p-6">
-          <h2 className="text-xl font-semibold text-slate-100">Findings</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-100">Findings</h2>
+            {initialData.scan.aiEnabled && (
+              <span className="rounded-lg border border-violet-300/30 bg-violet-400/15 px-2 py-1 text-xs font-semibold text-violet-200">
+                AI-Enhanced
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-slate-300">
             Expand each finding for detail, hints, and remediation workflow actions.
           </p>
+
+          {!initialData.scan.aiEnabled && initialData.findings.length > 0 && (
+            <div className="mt-3 flex items-center gap-3 rounded-xl border border-violet-300/20 bg-violet-400/5 px-4 py-3">
+              <p className="text-sm text-violet-100">
+                Unlock deeper AI-powered analysis with Plus or Pro.
+              </p>
+              <Link href="/pricing" className="shrink-0 text-sm font-semibold text-violet-200 hover:underline">
+                Upgrade
+              </Link>
+            </div>
+          )}
+
           <ul className="mt-4 space-y-3">
             {initialData.findings.length === 0 ? (
               <li className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-300">
@@ -261,8 +282,13 @@ export default function ScanResultClient({
                       className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                       onClick={() => toggleExpanded(finding.id)}
                     >
-                      <div>
+                      <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-slate-100">{finding.severity.toUpperCase()}</p>
+                        {finding.source === "AI" && (
+                          <span className="rounded-md border border-violet-300/30 bg-violet-400/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-200">
+                            AI
+                          </span>
+                        )}
                         <p className="text-xs text-slate-400">{categoryFromFinding(finding)}</p>
                       </div>
                       <span className="text-xs text-slate-400">{expanded ? "Collapse" : "Expand"}</span>
