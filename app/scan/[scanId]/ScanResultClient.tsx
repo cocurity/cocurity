@@ -97,7 +97,9 @@ export default function ScanResultClient({
   const isNoFindingsAudit = mode === "audit" && initialData.findings.length === 0;
   const isNoCategoryDependency = mode === "dependency" && categories.length === 0;
   const reportId = initialData.scan.id;
-  const repoName = initialData.scan.repoUrl.split("/").slice(-1)[0] || "repository";
+  const repoSegments = initialData.scan.repoUrl.split("/").filter(Boolean);
+  const repoOwner = repoSegments[repoSegments.length - 2] || "";
+  const repoName = repoSegments[repoSegments.length - 1] || "repository";
   const giftPurchased = searchParams.get("gift_paid") === "1";
   const paymentDone = searchParams.get("payment_done") === "1";
   const notifyTemplate = giftPurchased
@@ -184,10 +186,26 @@ export default function ScanResultClient({
 
   async function onSendMessage() {
     try {
+      const res = await fetch(`/api/github-user/${encodeURIComponent(repoOwner)}`);
+      const data = (await res.json()) as { email?: string | null; profileUrl?: string };
+
+      if (data.email) {
+        const subject = encodeURIComponent(`[Cocurity] Security findings in ${repoName}`);
+        const body = encodeURIComponent(notifyTemplate);
+        window.open(`mailto:${data.email}?subject=${subject}&body=${body}`, "_self");
+        return;
+      }
+
       await navigator.clipboard.writeText(notifyTemplate);
-      setActionMessage("Message sent!");
+      if (data.profileUrl) {
+        setActionMessage("No public email found — message copied. Opening GitHub profile.");
+        window.open(data.profileUrl, "_blank");
+      } else {
+        setActionMessage("No public email found — message copied to clipboard.");
+      }
     } catch {
-      setActionMessage("Message sending failed.");
+      await navigator.clipboard.writeText(notifyTemplate).catch(() => {});
+      setActionMessage("Could not look up email — message copied to clipboard.");
     }
   }
 
@@ -432,20 +450,18 @@ export default function ScanResultClient({
                 <button type="button" className="lp-button lp-button-primary" onClick={onSendMessage}>
                   Send message
                 </button>
+                {!giftPurchased ? (
+                  <button
+                    type="button"
+                    className="lp-button lp-button-ghost"
+                    onClick={() => setShowGiftOptions((prev) => !prev)}
+                  >
+                    Gift remediation rights
+                  </button>
+                ) : null}
                 <button type="button" className="lp-button lp-button-ghost" onClick={() => setShowNotifyModal(false)}>
                   Close
                 </button>
-                {!giftPurchased ? (
-                  <>
-                    <button
-                      type="button"
-                      className="lp-button lp-button-ghost"
-                      onClick={() => setShowGiftOptions((prev) => !prev)}
-                    >
-                      Gift remediation rights
-                    </button>
-                  </>
-                ) : null}
               </div>
 
               {showGiftOptions && !giftPurchased ? (
