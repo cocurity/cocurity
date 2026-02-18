@@ -78,6 +78,8 @@ export default function ScanResultClient({
   const [giftFixPass, setGiftFixPass] = useState(true);
   const [giftCertPass, setGiftCertPass] = useState(true);
   const [showPaymentDoneModal, setShowPaymentDoneModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [userPlan, setUserPlan] = useState<string | null>(null);
 
   const ffCert = process.env.NEXT_PUBLIC_FF_CERT_ENABLED === "1";
 
@@ -100,6 +102,30 @@ export default function ScanResultClient({
         `Hi maintainer of ${repoName}, Cocurity found potential security issues.`,
         `View report: https://cocurity.com/r/${reportId}`,
       ].join("\n");
+
+  useEffect(() => {
+    if (initialData.scan.aiEnabled) return;
+
+    if (!session?.user) {
+      const timer = window.setTimeout(() => setShowUpgradeModal(true), 2500);
+      return () => window.clearTimeout(timer);
+    }
+
+    let cancelled = false;
+    fetch("/api/subscription")
+      .then((res) => res.json())
+      .then((data: { plan?: string }) => {
+        if (cancelled) return;
+        const plan = data.plan ?? "FREE";
+        setUserPlan(plan);
+        if (plan === "FREE") {
+          const timer = window.setTimeout(() => setShowUpgradeModal(true), 2000);
+          return () => window.clearTimeout(timer);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [session, initialData.scan.aiEnabled]);
 
   useEffect(() => {
     if (!giftPurchased) return;
@@ -476,6 +502,81 @@ export default function ScanResultClient({
               <div className="mt-5">
                 <button type="button" className="lp-button lp-button-primary" onClick={() => setShowPaymentDoneModal(false)}>
                   닫기
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showUpgradeModal ? (
+          <motion.div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ y: 20, opacity: 0, scale: 0.97 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 20, opacity: 0, scale: 0.97 }}
+              className="co-noise-card w-full max-w-lg rounded-2xl p-6"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="inline-flex rounded-lg border border-violet-300/30 bg-violet-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-200">
+                    Premium
+                  </span>
+                  <h3 className="mt-3 text-xl font-semibold text-slate-100">
+                    Get deeper insights with AI scanning
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  className="text-slate-400 hover:text-slate-200"
+                  onClick={() => setShowUpgradeModal(false)}
+                >
+                  <span className="sr-only">Close</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
+              </div>
+
+              <p className="mt-3 text-sm text-slate-300">
+                Your scan found {initialData.scan.criticalCount + initialData.scan.warningCount} issue{initialData.scan.criticalCount + initialData.scan.warningCount !== 1 ? "s" : ""} using rule-based detection.
+                AI-enhanced scanning can uncover hidden vulnerabilities that regex patterns miss.
+              </p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-cyan-200/20 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-slate-400">Plus</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-100">$19<span className="text-sm font-normal text-slate-400">/mo</span></p>
+                  <ul className="mt-3 space-y-1 text-xs text-slate-300">
+                    <li>AI-enhanced scanning</li>
+                    <li>300 scans/month</li>
+                    <li>2,000 files/scan</li>
+                  </ul>
+                </div>
+                <div className="rounded-xl border border-amber-200/30 bg-amber-400/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-amber-200">Pro</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-100">$49<span className="text-sm font-normal text-slate-400">/mo</span></p>
+                  <ul className="mt-3 space-y-1 text-xs text-slate-300">
+                    <li>AI-enhanced scanning</li>
+                    <li>2,000 scans/month</li>
+                    <li>Priority support</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-5 flex gap-2">
+                <Link
+                  href={`/pricing?plan=pro&returnTo=${encodeURIComponent(`/scan/${initialData.scan.id}?mode=${mode}`)}`}
+                  className="lp-button lp-button-primary no-underline"
+                >
+                  Upgrade now
+                </Link>
+                <button type="button" className="lp-button lp-button-ghost" onClick={() => setShowUpgradeModal(false)}>
+                  Maybe later
                 </button>
               </div>
             </motion.div>
