@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createOrReuseScan } from "@/lib/scan-service";
 import { formatScanError } from "@/lib/scanner";
@@ -6,6 +7,9 @@ import { formatScanError } from "@/lib/scanner";
 type Props = { params: Promise<{ scanId: string }> };
 
 export async function POST(_: Request, { params }: Props) {
+  const session = await auth();
+  const userId = session?.user?.id ?? "";
+
   const { scanId } = await params;
   const existing = await prisma.scanRun.findUnique({ where: { id: scanId } });
   if (!existing) {
@@ -13,7 +17,7 @@ export async function POST(_: Request, { params }: Props) {
   }
 
   try {
-    const nextScanId = await createOrReuseScan(existing.repoUrl);
+    const nextScanId = await createOrReuseScan(existing.repoUrl, userId);
     return NextResponse.json({ scanId: nextScanId });
   } catch (error) {
     const formatted = formatScanError(error);

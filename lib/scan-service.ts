@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { computeScore } from "@/lib/scoring";
 import { scanGitHubRepository } from "@/lib/scanner";
 
-export async function createOrReuseScan(repoUrl: string) {
+export async function createOrReuseScan(repoUrl: string, userId = "") {
   const scanResult = await scanGitHubRepository(repoUrl);
   const cachedScan = await prisma.scanRun.findFirst({
     where: {
@@ -34,6 +34,7 @@ export async function createOrReuseScan(repoUrl: string) {
   const created = await prisma.scanRun.create({
     data: {
       projectId: project.id,
+      userId,
       repoUrl: scanResult.canonicalRepoUrl,
       commitHash: scanResult.commitHash,
       scanConfigVersion: scanResult.scanConfigVersion,

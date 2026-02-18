@@ -102,6 +102,7 @@ model Project {
 model ScanRun {
   id          String     @id @default(cuid())
   projectId   String
+  userId      String     @default("")
   repoUrl     String
   commitHash  String
   scanConfigVersion String
@@ -120,6 +121,7 @@ model ScanRun {
   @@index([repoUrl])
   @@index([commitHash])
   @@index([repoUrl, commitHash, scanConfigVersion])
+  @@index([userId])
 }
 
 model Finding {
@@ -140,6 +142,7 @@ model Certificate {
   id        String   @id @default(cuid())
   certId    String   @unique
   scanRunId String
+  userId    String  @default("")
   status    CertificateStatus @default(VALID)
   pngPath   String
   verifyUrl String
@@ -151,11 +154,13 @@ model Certificate {
 
   @@index([certId])
   @@index([scanRunId])
+  @@index([userId])
 }
 
 model FixRequest {
   id        String   @id @default(cuid())
   scanRunId String
+  userId    String  @default("")
   contact   String
   urgency   String
   notes     String
@@ -163,4 +168,5 @@ model FixRequest {
   scanRun   ScanRun  @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
 
   @@index([scanRunId])
+  @@index([userId])
 }

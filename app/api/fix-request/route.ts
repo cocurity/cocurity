@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 type FixRequestBody = {
@@ -9,6 +10,11 @@ type FixRequestBody = {
 };
 
 export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
   if (process.env.FF_FIX_ENABLED !== "1") {
     return NextResponse.json(
       { error: "Fix request is disabled by feature flag." },
@@ -43,6 +49,7 @@ export async function POST(request: Request) {
   const requestRecord = await prisma.fixRequest.create({
     data: {
       scanRunId: scanId,
+      userId: session.user.id,
       contact,
       urgency,
       notes,

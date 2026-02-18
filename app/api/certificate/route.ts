@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { buildCertId, renderCertificateImage } from "@/lib/certificate";
 
 type CertificateRequestBody = { scanId?: string };
 
 export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
   if (process.env.FF_CERT_ENABLED !== "1") {
     return NextResponse.json(
       { error: "Certificate issuance is disabled by feature flag." },
@@ -60,6 +66,7 @@ export async function POST(request: Request) {
     data: {
       certId,
       scanRunId: scanRun.id,
+      userId: session.user.id,
       status: "VALID",
       pngPath: rendered.imagePath,
       verifyUrl,

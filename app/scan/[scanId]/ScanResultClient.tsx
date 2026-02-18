@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import StatTiles from "@/components/ui/StatTiles";
@@ -66,6 +67,7 @@ export default function ScanResultClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
@@ -119,6 +121,11 @@ export default function ScanResultClient({
   }
 
   async function onIssueCertificate() {
+    if (!session?.user) {
+      const current = `/scan/${initialData.scan.id}?mode=${mode}`;
+      router.push(`/login?callbackUrl=${encodeURIComponent(current)}`);
+      return;
+    }
     setActionMessage(null);
     setIsIssuing(true);
     try {
@@ -149,26 +156,39 @@ export default function ScanResultClient({
     }
   }
 
+  function requireAuth(next: () => void) {
+    if (!session?.user) {
+      const current = `/scan/${initialData.scan.id}?mode=${mode}`;
+      router.push(`/login?callbackUrl=${encodeURIComponent(current)}`);
+      return;
+    }
+    next();
+  }
+
   function onGiftCheckout() {
-    const returnTo = `/scan/${initialData.scan.id}?mode=${mode}&gift_paid=1`;
-    const href =
-      `/pricing?plan=pro&context=gift` +
-      `&returnTo=${encodeURIComponent(returnTo)}` +
-      `&scanId=${encodeURIComponent(initialData.scan.id)}` +
-      `&repoUrl=${encodeURIComponent(initialData.scan.repoUrl)}` +
-      `&giftFix=${giftFixPass ? "1" : "0"}` +
-      `&giftCert=${giftCertPass ? "1" : "0"}`;
-    router.push(href);
+    requireAuth(() => {
+      const returnTo = `/scan/${initialData.scan.id}?mode=${mode}&gift_paid=1`;
+      const href =
+        `/pricing?plan=pro&context=gift` +
+        `&returnTo=${encodeURIComponent(returnTo)}` +
+        `&scanId=${encodeURIComponent(initialData.scan.id)}` +
+        `&repoUrl=${encodeURIComponent(initialData.scan.repoUrl)}` +
+        `&giftFix=${giftFixPass ? "1" : "0"}` +
+        `&giftCert=${giftCertPass ? "1" : "0"}`;
+      router.push(href);
+    });
   }
 
   function onCocourityFixCheckout() {
-    const returnTo = `/scan/${initialData.scan.id}?mode=${mode}`;
-    router.push(
-      `/pricing?context=gift&plan=pro&giftFix=1&giftCert=0` +
-        `&scanId=${encodeURIComponent(initialData.scan.id)}` +
-        `&repoUrl=${encodeURIComponent(initialData.scan.repoUrl)}` +
-        `&returnTo=${encodeURIComponent(returnTo)}`
-    );
+    requireAuth(() => {
+      const returnTo = `/scan/${initialData.scan.id}?mode=${mode}`;
+      router.push(
+        `/pricing?context=gift&plan=pro&giftFix=1&giftCert=0` +
+          `&scanId=${encodeURIComponent(initialData.scan.id)}` +
+          `&repoUrl=${encodeURIComponent(initialData.scan.repoUrl)}` +
+          `&returnTo=${encodeURIComponent(returnTo)}`
+      );
+    });
   }
 
   return (
