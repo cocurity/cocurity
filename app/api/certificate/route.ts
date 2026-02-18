@@ -66,7 +66,6 @@ export async function POST(request: Request) {
     data: {
       certId,
       scanRunId: scanRun.id,
-      userId: session.user.id,
       status: "VALID",
       pngPath: rendered.imagePath,
       verifyUrl,

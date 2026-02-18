@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { createOrReuseScan } from "@/lib/scan-service";
 import { formatScanError, parseGitHubRepoUrl } from "@/lib/scanner";
 
 type ScanRequestBody = { repoUrl?: string };
 
 export async function POST(request: Request) {
-  const session = await auth();
-  const userId = session?.user?.id ?? "";
-
   let body: ScanRequestBody;
   try {
     body = (await request.json()) as ScanRequestBody;
@@ -23,7 +19,7 @@ export async function POST(request: Request) {
 
   try {
     parseGitHubRepoUrl(repoUrl);
-    const scanId = await createOrReuseScan(repoUrl, userId);
+    const scanId = await createOrReuseScan(repoUrl);
     return NextResponse.json({ scanId });
   } catch (error) {
     const formatted = formatScanError(error);
