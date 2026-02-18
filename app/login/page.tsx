@@ -2,9 +2,31 @@ import { auth, signIn } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-export default async function LoginPage() {
+type Props = {
+  searchParams: Promise<{ callbackUrl?: string }>;
+};
+
+const ALLOWED_PATHS = ["/mypage", "/pricing", "/scan"];
+
+function resolveRedirectTo(callbackUrl?: string): string {
+  if (!callbackUrl) return "/mypage";
+  try {
+    const url = new URL(callbackUrl, "http://localhost");
+    if (ALLOWED_PATHS.some((p) => url.pathname.startsWith(p))) {
+      return url.pathname + url.search;
+    }
+  } catch {
+    void 0;
+  }
+  return "/mypage";
+}
+
+export default async function LoginPage({ searchParams }: Props) {
   const session = await auth();
-  if (session?.user) redirect("/mypage");
+  const { callbackUrl } = await searchParams;
+  const redirectTo = resolveRedirectTo(callbackUrl);
+
+  if (session?.user) redirect(redirectTo);
 
   return (
     <main className="flex min-h-[60vh] items-center justify-center">
@@ -22,7 +44,7 @@ export default async function LoginPage() {
           className="mt-8"
           action={async () => {
             "use server";
-            await signIn("github", { redirectTo: "/mypage" });
+            await signIn("github", { redirectTo });
           }}
         >
           <button
