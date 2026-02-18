@@ -1,28 +1,22 @@
 import { randomBytes } from "node:crypto";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { put } from "@vercel/blob";
 import { Resvg, type ResvgRenderOptions } from "@resvg/resvg-js";
 import QRCode from "qrcode";
+import { INTER_REGULAR, INTER_BOLD } from "./fonts";
 
 type FontOptions = NonNullable<ResvgRenderOptions["font"]> & { fontBuffers?: Buffer[] };
 
-let fontCache: { regular: Buffer; bold: Buffer; regularB64: string; boldB64: string } | null = null;
+const fontData = {
+  regular: INTER_REGULAR,
+  bold: INTER_BOLD,
+  regularB64: INTER_REGULAR.toString("base64"),
+  boldB64: INTER_BOLD.toString("base64"),
+};
 
-async function loadFonts() {
-  if (fontCache) return fontCache;
-  const fontsDir = join(process.cwd(), "assets", "fonts");
-  const [regular, bold] = await Promise.all([
-    readFile(join(fontsDir, "Inter-Regular.woff2")),
-    readFile(join(fontsDir, "Inter-Bold.woff2")),
-  ]);
-  fontCache = {
-    regular,
-    bold,
-    regularB64: regular.toString("base64"),
-    boldB64: bold.toString("base64"),
-  };
-  return fontCache;
+function loadFonts() {
+  return fontData;
 }
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
