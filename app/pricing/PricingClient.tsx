@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { addFixOrder } from "@/lib/client/fix-orders";
 
 const MEMBERSHIPS = [
@@ -47,6 +48,7 @@ export default function PricingClient() {
 function PricingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { status: sessionStatus } = useSession();
   const initialPlan = searchParams.get("plan");
   const context = searchParams.get("context");
   const returnTo = searchParams.get("returnTo");
@@ -58,6 +60,7 @@ function PricingContent() {
   const [giftCert, setGiftCert] = useState(searchParams.get("giftCert") === "1");
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [existingPlan, setExistingPlan] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -70,7 +73,20 @@ function PricingContent() {
     [selectedPlanId]
   );
 
+  useEffect(() => {
+    if (sessionStatus !== "authenticated") return;
+    let cancelled = false;
+    fetch("/api/subscription")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { plan?: string } | null) => {
+        if (!cancelled && data?.plan) setExistingPlan(data.plan);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [sessionStatus]);
+
   const isGiftCheckout = context === "gift";
+  const isPaidPlan = existingPlan === "PLUS" || existingPlan === "PRO";
   const giftSubtotal = (giftFix ? GIFT_ITEMS.fix.price : 0) + (giftCert ? GIFT_ITEMS.cert.price : 0);
   const giftBundleDiscount = giftFix && giftCert ? 19 : 0;
   const giftTotal = Math.max(0, giftSubtotal - giftBundleDiscount);
@@ -126,6 +142,42 @@ function PricingContent() {
     } finally {
       setProcessing(false);
     }
+  }
+
+  if (isPaidPlan && !isGiftCheckout) {
+    return (
+      <main className="space-y-6">
+        <section className="co-noise-card rounded-2xl p-6">
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-200/20 bg-gradient-to-br from-[#121a33] via-[#0d1429] to-[#182345] p-6">
+            <div className="pointer-events-none absolute -left-20 top-8 h-56 w-56 rounded-full bg-emerald-300/20 blur-3xl" />
+            <div className="pointer-events-none absolute -right-20 bottom-0 h-56 w-56 rounded-full bg-cyan-300/15 blur-3xl" />
+            <p className="relative z-10 text-xs uppercase tracking-[0.2em] text-emerald-200">Active Membership</p>
+            <h1 className="relative z-10 mt-3 text-2xl font-semibold text-slate-100">
+              You&apos;re on the {existingPlan === "PRO" ? "Pro" : "Plus"} plan
+            </h1>
+            <p className="relative z-10 mt-2 text-sm text-slate-300">
+              Your membership is active. AI-enhanced scanning and expanded capacity are already enabled.
+            </p>
+            <div className="relative z-10 mt-5 flex gap-3">
+              <button
+                type="button"
+                className="lp-button lp-button-primary"
+                onClick={() => returnTo ? router.push(returnTo) : router.back()}
+              >
+                {returnTo ? "Back to scan" : "Go back"}
+              </button>
+              <button
+                type="button"
+                className="text-sm text-cyan-200 underline-offset-2 hover:underline"
+                onClick={() => router.push("/mypage")}
+              >
+                View my page
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (
