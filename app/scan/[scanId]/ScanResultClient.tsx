@@ -197,11 +197,14 @@ export default function ScanResultClient({
       }
 
       await navigator.clipboard.writeText(notifyTemplate);
-      if (data.profileUrl) {
-        setActionMessage("No public email found — message copied. Opening GitHub profile.");
-        window.open(data.profileUrl, "_blank");
-      } else {
-        setActionMessage("No public email found — message copied to clipboard.");
+      const profileUrl = data.profileUrl ?? `https://github.com/${repoOwner}`;
+      const proceed = window.confirm(
+        "No public email found for this maintainer.\n\n" +
+        "The notification message has been copied to your clipboard.\n" +
+        "Would you like to open their GitHub profile to contact them directly?"
+      );
+      if (proceed) {
+        window.open(profileUrl, "_blank");
       }
     } catch {
       await navigator.clipboard.writeText(notifyTemplate).catch(() => {});
