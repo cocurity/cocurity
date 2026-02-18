@@ -84,29 +84,48 @@ function PricingContent() {
     }
     setMessage(null);
     setProcessing(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    setProcessing(false);
 
-    if (isGiftCheckout && giftFix) {
-      addFixOrder({
-        id: `fix_${Date.now()}`,
-        scanId,
-        repoUrl,
-        email,
-        items: [giftFix ? "Cocurity Fix Pass" : null, giftCert ? "Certification Pass" : null].filter(
-          Boolean
-        ) as string[],
-        status: "received",
-        createdAt: new Date().toISOString(),
-      });
-    }
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
 
-    if (returnTo) {
-      const separator = returnTo.includes("?") ? "&" : "?";
-      router.push(`${returnTo}${separator}payment_done=1`);
-      return;
+      if (isGiftCheckout && giftFix) {
+        addFixOrder({
+          id: `fix_${Date.now()}`,
+          scanId,
+          repoUrl,
+          email,
+          items: [giftFix ? "Cocurity Fix Pass" : null, giftCert ? "Certification Pass" : null].filter(
+            Boolean
+          ) as string[],
+          status: "received",
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      if (!isGiftCheckout) {
+        const res = await fetch("/api/subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ planId: selectedPlanId }),
+        });
+        if (!res.ok) {
+          const data = (await res.json()) as { error?: string };
+          setMessage(data.error ?? "Subscription update failed.");
+          return;
+        }
+      }
+
+      if (returnTo) {
+        const separator = returnTo.includes("?") ? "&" : "?";
+        router.push(`${returnTo}${separator}payment_done=1`);
+        return;
+      }
+      setMessage("Payment completed successfully.");
+    } catch {
+      setMessage("Network error during payment.");
+    } finally {
+      setProcessing(false);
     }
-    setMessage("Payment completed successfully.");
   }
 
   return (
